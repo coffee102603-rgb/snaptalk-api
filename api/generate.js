@@ -1,104 +1,32 @@
-import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import { create as createYoutubeDl } from 'youtube-dl-exec';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const ytDlpPath = path.join(process.cwd(), 'node_modules', 'youtube-dl-exec', 'bin', 'yt-dlp');
-const youtubeDl = fs.existsSync(ytDlpPath) ? createYoutubeDl(ytDlpPath) : (await import('youtube-dl-exec')).default;
 
 function extractVideoId(url) {
   if (!url) return null;
-  const patterns = [
-    /shorts\/([A-Za-z0-9_-]{11})/,
-    /[?&]v=([A-Za-z0-9_-]{11})/,
-    /youtu\.be\/([A-Za-z0-9_-]{11})/,
-    /^([A-Za-z0-9_-]{11})$/
-  ];
-  for (const p of patterns) {
-    const m = url.match(p);
-    if (m) return m[1];
-  }
+  const patterns = [/shorts\/([A-Za-z0-9_-]{11})/, /[?&]v=([A-Za-z0-9_-]{11})/, /youtu\.be\/([A-Za-z0-9_-]{11})/, /^([A-Za-z0-9_-]{11})$/];
+  for (const p of patterns) { const m = url.match(p); if (m) return m[1]; }
   return null;
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Use POST' });
-
-  try {
-    const { videoUrl, title, tab = 'us', difficulty = 'intermediate', category = 'daily' } = req.body || {};
-    if (!videoUrl) return res.status(400).json({ success: false, error: 'videoUrl is required' });
-
-    const videoId = extractVideoId(videoUrl);
-    if (!videoId) return res.status(400).json({ success: false, error: 'Invalid YouTube URL' });
-
-    console.log(`[${videoId}] Starting...`);
-
-    const tmpDir = os.tmpdir();
-    const audioPath = path.join(tmpDir, `${videoId}.mp3`);
-
-    console.log(`[${videoId}] Downloading audio...`);
-    await youtubeDl(`https://www.youtube.com/watch?v=${videoId}`, {
-      extractAudio: true,
-      audioFormat: 'mp3',
-      audioQuality: 0,
-      output: audioPath.replace('.mp3', '.%(ext)s'),
-      noCheckCertificates: true,
-      noWarnings: true,
-      preferFreeFormats: true,
-      addHeader: ['referer:youtube.com', 'user-agent:Mozilla/5.0'],
-    });
-
-    if (!fs.existsSync(audioPath)) throw new Error('Audio download failed');
-
-    console.log(`[${videoId}] Transcribing with Whisper...`);
-    const transcription = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(audioPath),
-      model: 'whisper-1',
-      response_format: 'verbose_json',
-      timestamp_granularities: ['segment'],
-    });
-
-    fs.unlinkSync(audioPath);
-
-    const segments = transcription.segments || [];
-    if (segments.length === 0) throw new Error('No speech detected');
-
-    const merged = mergeSentences(segments);
-    const finalSentences = merged.slice(0, 5);
-
-    console.log(`[${videoId}] Asking Claude...`);
-    const enrichedSentences = await enrichWithClaude(finalSentences);
-
-    const catIcons = { interview: '🎤', food: '🍔', daily: '☀️', kpop: '💃', travel: '✈️', business: '👔', drama: '🎭' };
-
-    const lesson = {
-      id: videoId,
-      title: title || `YouTube Short ${videoId}`,
-      cat: category,
-      catIcon: catIcons[category] || '📺',
-      diff: difficulty,
-      dubs: 0,
-      sentences: enrichedSentences,
-      _tab: tab,
-    };
-
-    console.log(`[${videoId}] Done!`);
-    return res.status(200).json({ success: true, lesson, language: transcription.language });
-
-  } catch (error) {
-    console.error('Error:', error);
-    return res.status(500).json({ success: false, error: error.message, details: error.stack });
+async function fetchTranscript(videoId) {
+  const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept-Language': 'en-US,en;q=0.9' } });
+  const html = await res.text();
+  const captionMatch = html.match(/"captionTracks":\[(.*?)\]/);
+  if (!captionMatch) return null;
+  const tracks = JSON.parse(`[${captionMatch[1]}]`);
+  const enTrack = tracks.find(t => t.languageCode === 'en') || tracks.find(t => t.languageCode && t.languageCode.startsWith('en')) || tracks[0];
+  if (!enTrack || !enTrack.baseUrl) return null;
+  const captionRes = await fetch(enTrack.baseUrl);
+  const xml = await captionRes.text();
+  const segments = [];
+  const regex = /<text start="([\d.]+)" dur="([\d.]+)"[^>]*>([\s\S]*?)<\/text>/g;
+  let match;
+  while ((match = regex.exec(xml)) !== null) {
+    segments.push({ start: parseFloat(match[1]), duration: parseFloat(match[2]), text: match[3].replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/<[^>]+>/g,'').trim() });
   }
+  return { segments, language: enTrack.languageCode || 'en' };
 }
 
 function mergeSentences(segments) {
@@ -107,61 +35,61 @@ function mergeSentences(segments) {
   for (const seg of segments) {
     const text = seg.text.trim();
     if (!text) continue;
-    if (!current) { current = { start: seg.start, end: seg.end, text }; continue; }
-    const duration = current.end - current.start;
-    const prevEndsPunct = /[.!?]$/.test(current.text);
-    if (duration < 2 && !prevEndsPunct) {
-      current.text += ' ' + text;
-      current.end = seg.end;
-    } else if (duration < 5 && !prevEndsPunct && text.length < 20) {
-      current.text += ' ' + text;
-      current.end = seg.end;
-    } else {
-      merged.push(current);
-      current = { start: seg.start, end: seg.end, text };
-    }
+    if (!current) { current = { start: seg.start, end: seg.start + seg.duration, text }; continue; }
+    const dur = current.end - current.start;
+    const endsPunct = /[.!?]$/.test(current.text);
+    if (dur < 3 && !endsPunct) { current.text += ' ' + text; current.end = seg.start + seg.duration; }
+    else { merged.push(current); current = { start: seg.start, end: seg.start + seg.duration, text }; }
   }
   if (current) merged.push(current);
-  return merged.map(s => ({
-    start: parseFloat(s.start.toFixed(1)),
-    end: parseFloat(s.end.toFixed(1)),
-    en: s.text.replace(/\s+/g, ' ').trim(),
-  }));
+  return merged.map(s => ({ start: parseFloat(s.start.toFixed(1)), end: parseFloat(s.end.toFixed(1)), en: s.text.replace(/\s+/g,' ').trim() }));
 }
 
 async function enrichWithClaude(sentences) {
-  const prompt = `You are an expert English-Korean language teacher creating content for a YouTube Shorts dubbing learning app.
-
-For each sentence below, produce a JSON object with:
-- en: the English sentence (clean up if needed)
-- ko: natural Korean translation (speech-style, not formal)
-- core: ONE single English word that is the most important "sticky" content word to remember (noun/verb/adjective, NOT function words like 'the', 'is', 'a')
-- highlight: A 2-4 word English chunk/collocation that contains the core word (useful phrase for memorization)
-- koHighlight: The Korean translation of the highlight chunk
+  const prompt = `You are an expert English-Korean language teacher. For each sentence, return a JSON object:
+- en: English sentence (cleaned)
+- ko: natural Korean translation (casual speech style)
+- core: ONE important content word (noun/verb/adj, NOT function words)
+- highlight: 2-4 word English chunk containing the core
+- koHighlight: Korean translation of the highlight
 
 Sentences:
-${sentences.map((s, i) => `${i + 1}. [${s.start}s-${s.end}s] "${s.en}"`).join('\n')}
+${sentences.map((s, i) => `${i+1}. [${s.start}s] "${s.en}"`).join('\n')}
 
-Return ONLY a valid JSON array, no markdown, no explanation. Example:
+Return ONLY valid JSON array. Example:
 [{"en":"What do you do?","ko":"직업이 뭐예요?","core":"living","highlight":"for a living","koHighlight":"직업"}]`;
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 2000,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  const r = await anthropic.messages.create({ model: 'claude-sonnet-4-20250514', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] });
+  const text = r.content[0].text.trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
+  const parsed = JSON.parse(text);
+  return parsed.map((item, i) => ({ en: item.en || sentences[i]?.en || '', ko: item.ko || '', start: sentences[i]?.start ?? 0, end: sentences[i]?.end ?? 0, core: item.core || '', highlight: item.highlight || '', koHighlight: item.koHighlight || '' }));
+}
 
-  const text = response.content[0].text.trim();
-  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-  const parsed = JSON.parse(cleaned);
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Use POST' });
 
-  return parsed.map((item, i) => ({
-    en: item.en || sentences[i]?.en || '',
-    ko: item.ko || '',
-    start: sentences[i]?.start ?? 0,
-    end: sentences[i]?.end ?? 0,
-    core: item.core || '',
-    highlight: item.highlight || '',
-    koHighlight: item.koHighlight || '',
-  }));
+  try {
+    const { videoUrl, title, tab = 'us', difficulty = 'intermediate', category = 'daily' } = req.body || {};
+    if (!videoUrl) return res.status(400).json({ success: false, error: 'videoUrl is required' });
+    const videoId = extractVideoId(videoUrl);
+    if (!videoId) return res.status(400).json({ success: false, error: 'Invalid YouTube URL' });
+
+    const transcript = await fetchTranscript(videoId);
+    if (!transcript || transcript.segments.length === 0) return res.status(400).json({ success: false, error: 'No captions found for this video. Try a video with English subtitles.' });
+
+    const merged = mergeSentences(transcript.segments);
+    const final = merged.slice(0, 5);
+    const enriched = await enrichWithClaude(final);
+
+    const catIcons = { interview: '🎤', food: '🍔', daily: '☀️', kpop: '💃', travel: '✈️', business: '👔', drama: '🎭' };
+    const lesson = { id: videoId, title: title || `YouTube Short`, cat: category, catIcon: catIcons[category] || '📺', diff: difficulty, dubs: 0, sentences: enriched, _tab: tab };
+
+    return res.status(200).json({ success: true, lesson, language: transcript.language });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
 }
