@@ -1,0 +1,11 @@
+﻿{
+  "name": "snaptalk-api",
+  "version": "1.0.0",
+  "description": "SnapTalk Lesson Generator API",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "openai": "^4.77.0",
+    "youtube-dl-exec": "^3.0.10"
+  }
+}
