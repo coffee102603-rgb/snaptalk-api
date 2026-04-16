@@ -1,4 +1,4 @@
-﻿{
+{
   "functions": {
     "api/generate.js": {
       "maxDuration": 300
