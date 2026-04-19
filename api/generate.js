@@ -1,15 +1,17 @@
 // ============================================================
-// SnapTalk API v2.2 — 안정화 (youtube-transcript 제거)
+// SnapTalk API v2.3 — Supadata 통합! 🎯
 // ============================================================
 // 작동 순서:
-//   1. 직접 페이지 파싱 (수동 + 자동자막 모두 허용) ← 메인!
-//   2. Whisper 백업 (ytdl 가능 시)
-//   3. → Claude로 번역 + 교육자료화
+//   1. Supadata API ⭐ 메인! (Vercel에서도 완벽 작동!)
+//   2. 직접 페이지 파싱 (백업 1)
+//   3. Whisper (백업 2, ytdl 가능 시)
+//   → Claude로 번역 + 교육자료화
 // ============================================================
 
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI, { toFile } from 'openai';
 import ytdl from '@distube/ytdl-core';
+import { Supadata } from '@supadata/js';
 
 export default async function handler(req, res) {
   // CORS 헤더
@@ -42,26 +44,43 @@ export default async function handler(req, res) {
     const attempts = [];
 
     // ========================================
-    // STEP 1: 직접 파싱 (수동 + 자동 자막 모두!)
+    // STEP 1: Supadata API ⭐ 메인!
     // ========================================
     try {
-      console.log('  1️⃣ Trying direct caption parse...');
-      segments = await fetchViaDirectParse(videoId);
+      console.log('  1️⃣ Trying Supadata API...');
+      segments = await fetchViaSupadata(videoUrl);
       if (segments && segments.length > 0) {
-        source = 'direct-parse';
-        console.log(`  ✅ Direct parse: ${segments.length} segments`);
+        source = 'supadata';
+        console.log(`  ✅ Supadata: ${segments.length} segments`);
       }
     } catch (e) {
-      attempts.push(`direct-parse: ${e.message}`);
-      console.log(`  ⚠️ Direct parse failed: ${e.message}`);
+      attempts.push(`supadata: ${e.message}`);
+      console.log(`  ⚠️ Supadata failed: ${e.message}`);
     }
 
     // ========================================
-    // STEP 2: Whisper 백업
+    // STEP 2: 직접 파싱 (백업 1)
     // ========================================
     if (!segments || segments.length === 0) {
       try {
-        console.log('  2️⃣ Trying Whisper (may fail due to YouTube bot detection)...');
+        console.log('  2️⃣ Trying direct caption parse...');
+        segments = await fetchViaDirectParse(videoId);
+        if (segments && segments.length > 0) {
+          source = 'direct-parse';
+          console.log(`  ✅ Direct parse: ${segments.length} segments`);
+        }
+      } catch (e) {
+        attempts.push(`direct-parse: ${e.message}`);
+        console.log(`  ⚠️ Direct parse failed: ${e.message}`);
+      }
+    }
+
+    // ========================================
+    // STEP 3: Whisper (백업 2)
+    // ========================================
+    if (!segments || segments.length === 0) {
+      try {
+        console.log('  3️⃣ Trying Whisper (may fail due to YouTube bot detection)...');
         segments = await transcribeWithWhisper(videoUrl);
         source = 'whisper';
         console.log(`  ✅ Whisper: ${segments.length} segments`);
@@ -77,16 +96,16 @@ export default async function handler(req, res) {
     if (!segments || segments.length === 0) {
       return res.status(500).json({
         error: '자막을 가져올 수 없습니다',
-        hint: '이 영상은 자막이 전혀 없거나, YouTube가 일시적으로 접근을 차단했을 수 있습니다.',
+        hint: '이 영상은 자막이 전혀 없거나, 접근이 제한되어 있습니다.',
         attempts,
         elapsed: ((Date.now() - startTime) / 1000).toFixed(1) + 's'
       });
     }
 
     // ========================================
-    // STEP 3: Claude로 번역 + 교육자료화
+    // STEP 4: Claude로 번역 + 교육자료화
     // ========================================
-    console.log('  3️⃣ Generating lesson with Claude...');
+    console.log('  4️⃣ Generating lesson with Claude...');
     const lesson = await generateLessonWithClaude(segments);
     console.log(`  ✅ Lesson generated: ${lesson.sentences.length} sentences`);
 
@@ -126,7 +145,86 @@ function extractVideoId(url) {
 }
 
 // ============================================================
-// STEP 1: 직접 페이지 파싱 (수동 + 자동 자막 허용!)
+// STEP 1: Supadata API ⭐
+// ============================================================
+async function fetchViaSupadata(videoUrl) {
+  if (!process.env.SUPADATA_API_KEY) {
+    throw new Error('SUPADATA_API_KEY not configured');
+  }
+
+  const supadata = new Supadata({ apiKey: process.env.SUPADATA_API_KEY });
+
+  // mode: 'auto' = 수동 자막 먼저, 없으면 AI 생성
+  const result = await supadata.transcript({
+    url: videoUrl,
+    lang: 'en',
+    mode: 'auto'
+  });
+
+  // 비동기 작업 처리 (20분+ 영상)
+  if ('jobId' in result) {
+    console.log(`    ⏳ Async job started: ${result.jobId}`);
+    // 최대 55초 폴링 (Vercel 60초 제한)
+    for (let i = 0; i < 55; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      const jobResult = await supadata.transcript.getJobStatus(result.jobId);
+      
+      if (jobResult.status === 'completed') {
+        return convertSupadataToSegments(jobResult.content);
+      } else if (jobResult.status === 'failed') {
+        throw new Error(`Supadata job failed: ${jobResult.error}`);
+      }
+      // queued, in_progress: 계속 대기
+    }
+    throw new Error('Supadata job timeout (55s)');
+  }
+
+  // 즉시 결과
+  return convertSupadataToSegments(result.content);
+}
+
+function convertSupadataToSegments(content) {
+  if (!content) {
+    throw new Error('Supadata returned no content');
+  }
+
+  // content가 string이면 (text: true 모드)
+  if (typeof content === 'string') {
+    throw new Error('Supadata returned plain text (need timestamps)');
+  }
+
+  // content가 array of segments (timestamped mode)
+  if (!Array.isArray(content)) {
+    throw new Error('Supadata returned unexpected format');
+  }
+
+  const segments = content.map(seg => {
+    // offset/duration이 ms 단위 vs 초 단위 대응
+    const offsetMs = seg.offset || 0;
+    const durationMs = seg.duration || 0;
+    
+    // 보통 ms로 옴. 큰 숫자면 ms로 간주
+    const isMs = offsetMs > 100 || durationMs > 100;
+    
+    const start = isMs ? offsetMs / 1000 : offsetMs;
+    const duration = isMs ? durationMs / 1000 : durationMs;
+
+    return {
+      text: String(seg.text || '').trim(),
+      start,
+      end: start + duration
+    };
+  }).filter(s => s.text.length > 0 && s.end > s.start);
+
+  if (segments.length === 0) {
+    throw new Error('Supadata returned empty segments');
+  }
+
+  return segments;
+}
+
+// ============================================================
+// STEP 2: 직접 페이지 파싱 (백업)
 // ============================================================
 async function fetchViaDirectParse(videoId) {
   const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
@@ -142,11 +240,9 @@ async function fetchViaDirectParse(videoId) {
   }
 
   const html = await response.text();
-
-  // captionTracks 배열 추출
   const match = html.match(/"captionTracks":(\[[^\]]*\])/);
   if (!match) {
-    throw new Error('No caption tracks found in page');
+    throw new Error('No caption tracks found');
   }
 
   let tracks;
@@ -160,52 +256,31 @@ async function fetchViaDirectParse(videoId) {
     throw new Error('Empty caption tracks');
   }
 
-  // 🔧 v2.2: 수동 자막 우선, 없으면 ASR(자동자막)도 허용!
   const englishTrack =
-    // 1. 수동 업로드된 영어 자막 (최고!)
-    tracks.find(t =>
-      (t.languageCode === 'en' || t.languageCode === 'en-US') &&
-      t.kind !== 'asr'
-    ) ||
-    // 2. 자동 생성 영어 자막 (95% 영상 있음!)
-    tracks.find(t =>
-      t.languageCode === 'en' || t.languageCode === 'en-US'
-    ) ||
-    // 3. 영어 계열 자막
-    tracks.find(t =>
-      t.languageCode && t.languageCode.startsWith('en')
-    ) ||
-    // 4. 최후의 수단: 첫 번째 트랙
+    tracks.find(t => (t.languageCode === 'en' || t.languageCode === 'en-US') && t.kind !== 'asr') ||
+    tracks.find(t => t.languageCode === 'en' || t.languageCode === 'en-US') ||
+    tracks.find(t => t.languageCode && t.languageCode.startsWith('en')) ||
     tracks[0];
 
   if (!englishTrack || !englishTrack.baseUrl) {
-    throw new Error('No usable captions (no baseUrl)');
+    throw new Error('No usable captions');
   }
 
-  console.log(`    📝 Track: lang=${englishTrack.languageCode}, kind=${englishTrack.kind || 'manual'}`);
-
-  // 자막 XML 가져오기
   const captionsResponse = await fetch(englishTrack.baseUrl);
   if (!captionsResponse.ok) {
     throw new Error(`Captions fetch failed: ${captionsResponse.status}`);
   }
   const xml = await captionsResponse.text();
 
-  // XML 파싱
   const segments = [];
   const regex = /<text start="([\d.]+)" dur="([\d.]+)"(?:[^>]*)>([^<]*)<\/text>/g;
   let m;
   while ((m = regex.exec(xml)) !== null) {
     const text = decodeHtmlEntities(m[3]).trim();
     if (!text) continue;
-
     const start = parseFloat(m[1]);
     const dur = parseFloat(m[2]);
-    segments.push({
-      text,
-      start,
-      end: start + dur
-    });
+    segments.push({ text, start, end: start + dur });
   }
 
   if (segments.length === 0) {
@@ -227,7 +302,7 @@ function decodeHtmlEntities(str) {
 }
 
 // ============================================================
-// STEP 2: Whisper 백업 (ytdl 작동 시)
+// STEP 3: Whisper 백업
 // ============================================================
 async function transcribeWithWhisper(videoUrl) {
   if (!process.env.OPENAI_API_KEY) {
@@ -268,11 +343,7 @@ async function transcribeWithWhisper(videoUrl) {
   });
 
   const segments = (transcription.segments || [])
-    .map(s => ({
-      text: s.text.trim(),
-      start: s.start,
-      end: s.end
-    }))
+    .map(s => ({ text: s.text.trim(), start: s.start, end: s.end }))
     .filter(s => s.text.length > 0 && s.end > s.start);
 
   if (segments.length === 0) {
@@ -283,7 +354,7 @@ async function transcribeWithWhisper(videoUrl) {
 }
 
 // ============================================================
-// STEP 3: Claude로 번역 + 교육자료화
+// STEP 4: Claude로 번역 + 교육자료화
 // ============================================================
 async function generateLessonWithClaude(segments) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -292,13 +363,17 @@ async function generateLessonWithClaude(segments) {
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  const segmentsText = segments.map((s, i) =>
+  // 긴 영상 대응: 최대 30문장만 처리 (Claude 토큰 제한)
+  const workingSegments = segments.slice(0, 30);
+  const isPartial = segments.length > 30;
+
+  const segmentsText = workingSegments.map((s, i) =>
     `${i + 1}. [${s.start.toFixed(1)}~${s.end.toFixed(1)}s] ${s.text}`
   ).join('\n');
 
   const prompt = `You are an expert English teacher creating lesson content for Korean learners.
 
-Here are the English sentences from a YouTube Short (with timestamps):
+Here are the English sentences from a YouTube video (with timestamps):
 ${segmentsText}
 
 For EACH sentence, provide:
@@ -354,9 +429,13 @@ Return ONLY valid JSON (no markdown, no explanation, no code blocks):
   // 타임스탬프 정확성 보장
   parsed.sentences = parsed.sentences.map((s, i) => ({
     ...s,
-    start: segments[i] ? segments[i].start : s.start,
-    end: segments[i] ? segments[i].end : s.end
+    start: workingSegments[i] ? workingSegments[i].start : s.start,
+    end: workingSegments[i] ? workingSegments[i].end : s.end
   }));
+
+  if (isPartial) {
+    parsed.note = `Showing first 30 of ${segments.length} sentences`;
+  }
 
   return parsed;
 }
