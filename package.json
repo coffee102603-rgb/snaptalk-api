@@ -1,7 +1,7 @@
 {
   "name": "snaptalk-api",
-  "version": "2.0.0",
-  "description": "SnapTalk API - YouTube Shorts to English Lessons (with Whisper fallback)",
+  "version": "2.1.0",
+  "description": "SnapTalk API - YouTube Shorts to English Lessons (with anti-bot-detection strategies)",
   "type": "module",
   "main": "api/generate.js",
   "scripts": {
@@ -11,7 +11,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",
     "@distube/ytdl-core": "^4.14.4",
-    "openai": "^4.73.1"
+    "openai": "^4.73.1",
+    "youtube-transcript": "^1.2.1"
   },
   "engines": {
     "node": ">=18.0.0"
