@@ -1,18 +1,15 @@
 // ============================================================
-// SnapTalk API v2.1 — 봇 차단 우회 + 자동 자막 전략
+// SnapTalk API v2.2 — 안정화 (youtube-transcript 제거)
 // ============================================================
-// 작동 순서 (3단 방어!):
-//   1. youtube-transcript 패키지 시도 (공식 timedtext API, 99% 성공)
-//   2. 직접 페이지 파싱 (ASR 자동자막도 허용)
-//   3. Whisper 백업 (ytdl 가능한 경우)
-//   4. → Claude로 번역 + 교육자료화
-//   5. ✅ SnapTalk 포맷 JSON 반환
+// 작동 순서:
+//   1. 직접 페이지 파싱 (수동 + 자동자막 모두 허용) ← 메인!
+//   2. Whisper 백업 (ytdl 가능 시)
+//   3. → Claude로 번역 + 교육자료화
 // ============================================================
 
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI, { toFile } from 'openai';
 import ytdl from '@distube/ytdl-core';
-import { YoutubeTranscript } from 'youtube-transcript';
 
 export default async function handler(req, res) {
   // CORS 헤더
@@ -45,43 +42,26 @@ export default async function handler(req, res) {
     const attempts = [];
 
     // ========================================
-    // STEP 1: youtube-transcript 패키지 (가장 안정적!)
+    // STEP 1: 직접 파싱 (수동 + 자동 자막 모두!)
     // ========================================
     try {
-      console.log('  1️⃣ Trying youtube-transcript package...');
-      segments = await fetchViaTranscriptPackage(videoId);
+      console.log('  1️⃣ Trying direct caption parse...');
+      segments = await fetchViaDirectParse(videoId);
       if (segments && segments.length > 0) {
-        source = 'transcript-pkg';
-        console.log(`  ✅ Transcript package: ${segments.length} segments`);
+        source = 'direct-parse';
+        console.log(`  ✅ Direct parse: ${segments.length} segments`);
       }
     } catch (e) {
-      attempts.push(`transcript-pkg: ${e.message}`);
-      console.log(`  ⚠️ Transcript package failed: ${e.message}`);
+      attempts.push(`direct-parse: ${e.message}`);
+      console.log(`  ⚠️ Direct parse failed: ${e.message}`);
     }
 
     // ========================================
-    // STEP 2: 직접 파싱 (수동 + 자동 자막 모두)
+    // STEP 2: Whisper 백업
     // ========================================
     if (!segments || segments.length === 0) {
       try {
-        console.log('  2️⃣ Trying direct caption parse...');
-        segments = await fetchViaDirectParse(videoId);
-        if (segments && segments.length > 0) {
-          source = 'direct-parse';
-          console.log(`  ✅ Direct parse: ${segments.length} segments`);
-        }
-      } catch (e) {
-        attempts.push(`direct-parse: ${e.message}`);
-        console.log(`  ⚠️ Direct parse failed: ${e.message}`);
-      }
-    }
-
-    // ========================================
-    // STEP 3: Whisper 백업 (ytdl 작동 시에만)
-    // ========================================
-    if (!segments || segments.length === 0) {
-      try {
-        console.log('  3️⃣ Trying Whisper (may fail due to bot detection)...');
+        console.log('  2️⃣ Trying Whisper (may fail due to YouTube bot detection)...');
         segments = await transcribeWithWhisper(videoUrl);
         source = 'whisper';
         console.log(`  ✅ Whisper: ${segments.length} segments`);
@@ -104,9 +84,9 @@ export default async function handler(req, res) {
     }
 
     // ========================================
-    // STEP 4: Claude로 번역 + 교육자료화
+    // STEP 3: Claude로 번역 + 교육자료화
     // ========================================
-    console.log('  4️⃣ Generating lesson with Claude...');
+    console.log('  3️⃣ Generating lesson with Claude...');
     const lesson = await generateLessonWithClaude(segments);
     console.log(`  ✅ Lesson generated: ${lesson.sentences.length} sentences`);
 
@@ -124,6 +104,7 @@ export default async function handler(req, res) {
     console.error('❌ Error:', err);
     res.status(500).json({
       error: err.message || 'Internal server error',
+      stack: err.stack ? err.stack.split('\n').slice(0, 3).join('\n') : null,
       elapsed: ((Date.now() - startTime) / 1000).toFixed(1) + 's'
     });
   }
@@ -145,35 +126,7 @@ function extractVideoId(url) {
 }
 
 // ============================================================
-// STEP 1: youtube-transcript 패키지로 자막 가져오기
-// (자동 자막 포함! 봇 차단 없음!)
-// ============================================================
-async function fetchViaTranscriptPackage(videoId) {
-  // 영어 우선, 실패하면 아무 언어나
-  let items;
-  try {
-    items = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'en' });
-  } catch (e) {
-    // 영어 없으면 기본 언어로
-    items = await YoutubeTranscript.fetchTranscript(videoId);
-  }
-
-  if (!items || items.length === 0) {
-    throw new Error('No transcript items');
-  }
-
-  // Format: [{text, offset (ms), duration (ms), lang}, ...]
-  return items
-    .map(item => ({
-      text: decodeHtmlEntities(item.text).trim(),
-      start: item.offset / 1000,          // ms → s
-      end: (item.offset + item.duration) / 1000
-    }))
-    .filter(s => s.text.length > 0);
-}
-
-// ============================================================
-// STEP 2: 직접 페이지 파싱 (수동 + 자동 자막 허용!)
+// STEP 1: 직접 페이지 파싱 (수동 + 자동 자막 허용!)
 // ============================================================
 async function fetchViaDirectParse(videoId) {
   const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
@@ -193,40 +146,52 @@ async function fetchViaDirectParse(videoId) {
   // captionTracks 배열 추출
   const match = html.match(/"captionTracks":(\[[^\]]*\])/);
   if (!match) {
-    throw new Error('No caption tracks found');
+    throw new Error('No caption tracks found in page');
   }
 
   let tracks;
   try {
     tracks = JSON.parse(match[1]);
   } catch (e) {
-    throw new Error('Failed to parse caption tracks');
+    throw new Error('Failed to parse caption tracks JSON');
   }
 
-  // 🔧 v2.1: 수동 자막 우선, 없으면 ASR(자동자막)도 허용!
+  if (!tracks || tracks.length === 0) {
+    throw new Error('Empty caption tracks');
+  }
+
+  // 🔧 v2.2: 수동 자막 우선, 없으면 ASR(자동자막)도 허용!
   const englishTrack =
+    // 1. 수동 업로드된 영어 자막 (최고!)
     tracks.find(t =>
       (t.languageCode === 'en' || t.languageCode === 'en-US') &&
       t.kind !== 'asr'
     ) ||
+    // 2. 자동 생성 영어 자막 (95% 영상 있음!)
     tracks.find(t =>
       t.languageCode === 'en' || t.languageCode === 'en-US'
     ) ||
+    // 3. 영어 계열 자막
     tracks.find(t =>
       t.languageCode && t.languageCode.startsWith('en')
     ) ||
-    tracks[0]; // 최후의 수단: 첫 번째 트랙
+    // 4. 최후의 수단: 첫 번째 트랙
+    tracks[0];
 
   if (!englishTrack || !englishTrack.baseUrl) {
-    throw new Error('No usable captions');
+    throw new Error('No usable captions (no baseUrl)');
   }
 
+  console.log(`    📝 Track: lang=${englishTrack.languageCode}, kind=${englishTrack.kind || 'manual'}`);
+
+  // 자막 XML 가져오기
   const captionsResponse = await fetch(englishTrack.baseUrl);
   if (!captionsResponse.ok) {
     throw new Error(`Captions fetch failed: ${captionsResponse.status}`);
   }
   const xml = await captionsResponse.text();
 
+  // XML 파싱
   const segments = [];
   const regex = /<text start="([\d.]+)" dur="([\d.]+)"(?:[^>]*)>([^<]*)<\/text>/g;
   let m;
@@ -262,7 +227,7 @@ function decodeHtmlEntities(str) {
 }
 
 // ============================================================
-// STEP 3: Whisper 백업 (ytdl 작동 시)
+// STEP 2: Whisper 백업 (ytdl 작동 시)
 // ============================================================
 async function transcribeWithWhisper(videoUrl) {
   if (!process.env.OPENAI_API_KEY) {
@@ -318,7 +283,7 @@ async function transcribeWithWhisper(videoUrl) {
 }
 
 // ============================================================
-// STEP 4: Claude로 번역 + 교육자료화
+// STEP 3: Claude로 번역 + 교육자료화
 // ============================================================
 async function generateLessonWithClaude(segments) {
   if (!process.env.ANTHROPIC_API_KEY) {
