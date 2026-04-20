@@ -71,7 +71,28 @@ export default async function handler(req, res) {
       });
     }
 
+    // ========================================
+    // v2.5 호환: translations.ko.text → ko 루트 필드로 평탄화
+    // ========================================
+    // Curator/API가 주는 구조:   {en, translations:{ko:{text,highlight}}}
+    // 메인 앱이 읽는 구조:        {en, ko, koHighlight}
+    // → 메인 앱 호환을 위해 평탄화!
+    const normalizedSentences = sentences.map(s => {
+      const normalized = { ...s };
+      if (s.translations?.ko) {
+        if (s.translations.ko.text && !normalized.ko) {
+          normalized.ko = s.translations.ko.text;
+        }
+        if (s.translations.ko.highlight && !normalized.koHighlight) {
+          normalized.koHighlight = s.translations.ko.highlight;
+        }
+      }
+      // translations 필드는 유지 (나중에 다국어 확장 대비)
+      return normalized;
+    });
+
     console.log(`🚀 Uploading video: ${id} - ${title}`);
+    console.log(`  ✅ Normalized ${normalizedSentences.length} sentences (ko field populated)`);
 
     // ========================================
     // STEP 1: 현재 HTML 가져오기
@@ -121,7 +142,7 @@ export default async function handler(req, res) {
       catIcon: catIcon || '🎬',
       diff: diff || 'intermediate',
       dubs: dubs || 0,
-      sentences
+      sentences: normalizedSentences
     };
 
     // 선택적 필드 추가 (있는 경우에만)
