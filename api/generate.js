@@ -1,5 +1,5 @@
 // ============================================================
-// SnapTalk API v2.5 — 문장 합치기 + 뒤어읽기 마커! 📚
+// SnapTalk API v2.6 — 완전한 문장 + 촘촘한 청크 마커! 📚🎯
 // ============================================================
 // 작동 순서:
 //   1. Supadata API ⭐ 메인! (Vercel에서도 완벽 작동!)
@@ -7,9 +7,14 @@
 //   3. Whisper (백업 2, ytdl 가능 시)
 //   → Claude로 번역 + phonetic + 완전 문장 + 청크 마커
 // ============================================================
+// v2.6 변경사항:
+//   ✨ 문장 길이 제한 없음 — 의미 완결성 우선!
+//   ✨ 긴 문장도 나누지 말고 한 통으로 유지
+//   ✨ 대신 촘촘한 청크 마커 (3-6 단어마다)
+//   ✨ 호흡 단위 = 자연스러운 pause 지점 = TOEIC 끊어읽기!
 // v2.5 변경사항:
 //   ✨ 짧은 segments를 맥락상 완전한 문장으로 합침
-//   ✨ 청크(끊어읽기 단위)에 | 마커 삽입 → 학습자 리듬 습득
+//   ✨ 청크(끊어읽기 단위)에 | 마커 삽입
 //   ✨ 영어/한글/phonetic 모두 같은 위치에 | 마커
 // v2.4 변경사항:
 //   ✨ phonetic 필드 자동 생성 (영어 → 한글 음사)
@@ -378,34 +383,52 @@ async function generateLessonWithClaude(segments) {
     `${i + 1}. [${s.start.toFixed(1)}~${s.end.toFixed(1)}s] ${s.text}`
   ).join('\n');
 
-  const prompt = `You are an expert English teacher creating lesson content for Korean learners.
+  const prompt = `You are an expert English teacher creating lesson content for Korean learners studying with the "shadowing + chunking" method (used by TOEIC instructors for 15+ years).
 
 Here are raw YouTube caption segments (short, often cut mid-sentence):
 ${segmentsText}
 
 YOUR JOB:
-1. MERGE these short segments into COMPLETE, natural English sentences based on meaning.
-2. Add chunk markers "|" at natural reading breaks (breath units, phrases).
-3. Provide Korean translation with SAME chunk markers at aligned positions.
-4. Provide phonetic (Korean pronunciation) with SAME chunk markers at aligned positions.
-5. Keep timestamps aligned with the merged sentence (use start of first segment, end of last segment).
+1. MERGE these short segments into COMPLETE, meaningful English sentences.
+2. DO NOT split long sentences — keep them WHOLE even if lengthy (that's the WHOLE POINT for learning!).
+3. Add chunk markers "|" at natural reading/breath breaks FREQUENTLY (every 3-6 words).
+4. Provide Korean translation with SAME chunk markers at matching positions.
+5. Provide phonetic (Korean pronunciation) with SAME chunk markers at matching positions.
 
-CHUNK MARKER RULES:
+CRITICAL RULES ABOUT SENTENCE LENGTH:
+- Long sentences are GOOD — they preserve real meaning and force learners to think in English.
+- Example: "$250 a night so it's not cheap but to have the whole experience walking through the Princess Cruise's 12-day Vancouver-to-Alaska voyage it's absolutely worth it"
+  → KEEP as ONE sentence with MANY chunk markers!
+- NEVER cut a complete thought into 2+ sentences just because it's long.
+- The chunk markers (|) let learners read it comfortably despite length.
+
+CHUNK MARKER RULES (VERY IMPORTANT):
 - Use " | " (space-pipe-space) between chunks
-- A chunk = natural breath unit, typically 2-5 words
-- Break at: prepositional phrases, after subject, before conjunctions, before "that/which"
-- The number of | marks must match across en, ko, and phonetic
+- A chunk = natural breath unit, typically 3-6 words (be GENEROUS with markers!)
+- Break at: after subject, before verbs/objects, before prepositional phrases, before "that/which/and/but/so", after commas
+- The number of | marks must be IDENTICAL across en, ko, and phonetic
 - Short sentences (1-5 words) need NO markers
-- Examples:
-  * Short: "What is this?" → en: "What is this?" (no marker)
-  * Medium: "I went to the store yesterday" → "I went to the store | yesterday"
-  * Long: "$250 a night so it's not cheap but to have the whole experience it's worth it" 
-    → en: "$250 a night, | so it's not cheap, | but to have the whole experience, | it's worth it."
-    → ko: "하루에 $250, | 싸진 않지만, | 전체 경험을 해보기엔, | 가치 있어요."
-    → phonetic: "투 헌드레드 피프티 달러즈 어 나잇, | 쏘 잇츠 낫 칩, | 벗 투 해브 더 홀 익스피리언스, | 잇츠 워쓰 잇."
+- A 20-word sentence should have 4-6 markers for easy reading
+
+EXAMPLES:
+
+Short → no markers:
+  en: "What is this?"
+  ko: "이게 뭐예요?"
+  phonetic: "왓 이즈 디스?"
+
+Medium → 1-2 markers:
+  en: "I went to the store | yesterday."
+  ko: "저는 가게에 갔어요 | 어제요."
+  phonetic: "아이 웬트 투 더 스토어 | 예스터데이."
+
+Long → MANY markers (KEEP AS ONE SENTENCE!):
+  en: "$250 a night, | so it's not cheap, | but to have the whole experience, | walking through the entire ship, | it's absolutely worth it."
+  ko: "하루에 $250이라서, | 싸진 않지만, | 전체 경험을 해보고, | 배 전체를 둘러보기엔, | 정말 가치 있어요."
+  phonetic: "투 헌드레드 피프티 어 나잇, | 쏘 잇츠 낫 칩, | 벗 투 해브 더 홀 익스피리언스, | 워킹 쓰루 디 엔타이어 쉽, | 잇츠 앱솔루틀리 워쓰 잇."
 
 For EACH merged sentence, provide:
-1. "en": Complete English sentence with chunk markers (add punctuation naturally)
+1. "en": Complete English sentence (NO splitting!) with frequent | markers
 2. "start": Start time (of the first original segment merged)
 3. "end": End time (of the last original segment merged)
 4. "core": MOST IMPORTANT content word (noun/verb/adjective only — NO articles, NO pronouns, NO be-verbs)
@@ -419,15 +442,15 @@ Return ONLY valid JSON (no markdown, no code blocks, no explanation):
 {
   "sentences": [
     {
-      "en": "I work in finance | downtown.",
+      "en": "I work in finance | downtown | near the station.",
       "start": 0.5,
-      "end": 2.3,
+      "end": 3.2,
       "core": "finance",
       "highlight": "work in finance",
-      "phonetic": "아이 워크 인 파이낸스 | 다운타운.",
+      "phonetic": "아이 워크 인 파이낸스 | 다운타운 | 니어 더 스테이션.",
       "translations": {
         "ko": {
-          "text": "저는 금융 일을 해요 | 다운타운에서.",
+          "text": "저는 금융 일을 해요 | 다운타운에서 | 역 근처에요.",
           "highlight": "금융 일을 해요"
         }
       }
