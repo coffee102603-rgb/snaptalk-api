@@ -1,15 +1,18 @@
 // ============================================================
-// SnapTalk API v2.4 — Phonetic (한글 발음) 자동 생성! 🎤
+// SnapTalk API v2.5 — 문장 합치기 + 뒤어읽기 마커! 📚
 // ============================================================
 // 작동 순서:
 //   1. Supadata API ⭐ 메인! (Vercel에서도 완벽 작동!)
 //   2. 직접 페이지 파싱 (백업 1)
 //   3. Whisper (백업 2, ytdl 가능 시)
-//   → Claude로 번역 + phonetic + 교육자료화
+//   → Claude로 번역 + phonetic + 완전 문장 + 청크 마커
 // ============================================================
+// v2.5 변경사항:
+//   ✨ 짧은 segments를 맥락상 완전한 문장으로 합침
+//   ✨ 청크(끊어읽기 단위)에 | 마커 삽입 → 학습자 리듬 습득
+//   ✨ 영어/한글/phonetic 모두 같은 위치에 | 마커
 // v2.4 변경사항:
 //   ✨ phonetic 필드 자동 생성 (영어 → 한글 음사)
-//   예: "What do you do?" → "왓 두 유 두?"
 // ============================================================
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -377,44 +380,55 @@ async function generateLessonWithClaude(segments) {
 
   const prompt = `You are an expert English teacher creating lesson content for Korean learners.
 
-Here are the English sentences from a YouTube video (with timestamps):
+Here are raw YouTube caption segments (short, often cut mid-sentence):
 ${segmentsText}
 
-For EACH sentence, provide:
-1. "en": The exact English text (do not modify)
-2. "start": start time in seconds (use the timestamp I gave)
-3. "end": end time in seconds (use the timestamp I gave)
-4. "core": the MOST IMPORTANT content word (noun/verb/adjective only — NO articles like "the", NO pronouns like "I/you", NO be-verbs like "is/are")
-5. "highlight": a 2-4 word collocation containing the core word (e.g., "for a living", "look good", "make sense")
-6. "phonetic": Korean phonetic transcription (한글 음사) of the English sentence
-   - Write how the English sounds using Korean characters
-   - Keep spaces between English words
-   - Include original punctuation (? ! . , etc.)
-   - Use standard Korean transcription conventions commonly seen in Korean English textbooks
-   - Examples:
-     * "What do you do for a living?" → "왓 두 유 두 포 어 리빙?"
-     * "Are tacos actually better?" → "아 타코스 액츄얼리 베러?"
-     * "Let me try this." → "렛 미 트라이 디스."
-     * "This is amazing!" → "디스 이즈 어메이징!"
-     * "I love it." → "아이 러브 잇."
-7. "translations.ko.text": natural conversational Korean translation
-8. "translations.ko.highlight": Korean translation of just the highlight phrase
+YOUR JOB:
+1. MERGE these short segments into COMPLETE, natural English sentences based on meaning.
+2. Add chunk markers "|" at natural reading breaks (breath units, phrases).
+3. Provide Korean translation with SAME chunk markers at aligned positions.
+4. Provide phonetic (Korean pronunciation) with SAME chunk markers at aligned positions.
+5. Keep timestamps aligned with the merged sentence (use start of first segment, end of last segment).
 
-Return ONLY valid JSON (no markdown, no explanation, no code blocks):
+CHUNK MARKER RULES:
+- Use " | " (space-pipe-space) between chunks
+- A chunk = natural breath unit, typically 2-5 words
+- Break at: prepositional phrases, after subject, before conjunctions, before "that/which"
+- The number of | marks must match across en, ko, and phonetic
+- Short sentences (1-5 words) need NO markers
+- Examples:
+  * Short: "What is this?" → en: "What is this?" (no marker)
+  * Medium: "I went to the store yesterday" → "I went to the store | yesterday"
+  * Long: "$250 a night so it's not cheap but to have the whole experience it's worth it" 
+    → en: "$250 a night, | so it's not cheap, | but to have the whole experience, | it's worth it."
+    → ko: "하루에 $250, | 싸진 않지만, | 전체 경험을 해보기엔, | 가치 있어요."
+    → phonetic: "투 헌드레드 피프티 달러즈 어 나잇, | 쏘 잇츠 낫 칩, | 벗 투 해브 더 홀 익스피리언스, | 잇츠 워쓰 잇."
+
+For EACH merged sentence, provide:
+1. "en": Complete English sentence with chunk markers (add punctuation naturally)
+2. "start": Start time (of the first original segment merged)
+3. "end": End time (of the last original segment merged)
+4. "core": MOST IMPORTANT content word (noun/verb/adjective only — NO articles, NO pronouns, NO be-verbs)
+5. "highlight": A 2-4 word collocation containing the core word
+6. "phonetic": Korean phonetic with SAME | markers as "en" (standard textbook transcription)
+7. "translations.ko.text": Natural Korean with SAME | markers as "en"
+8. "translations.ko.highlight": Korean translation of just the highlight
+
+Return ONLY valid JSON (no markdown, no code blocks, no explanation):
 
 {
   "sentences": [
     {
-      "en": "What do you do for a living?",
+      "en": "I work in finance | downtown.",
       "start": 0.5,
       "end": 2.3,
-      "core": "living",
-      "highlight": "for a living",
-      "phonetic": "왓 두 유 두 포 어 리빙?",
+      "core": "finance",
+      "highlight": "work in finance",
+      "phonetic": "아이 워크 인 파이낸스 | 다운타운.",
       "translations": {
         "ko": {
-          "text": "직업이 뭐예요?",
-          "highlight": "직업"
+          "text": "저는 금융 일을 해요 | 다운타운에서.",
+          "highlight": "금융 일을 해요"
         }
       }
     }
@@ -442,15 +456,25 @@ Return ONLY valid JSON (no markdown, no explanation, no code blocks):
     throw new Error('Claude response missing sentences array');
   }
 
-  // 타임스탬프 정확성 보장
-  parsed.sentences = parsed.sentences.map((s, i) => ({
-    ...s,
-    start: workingSegments[i] ? workingSegments[i].start : s.start,
-    end: workingSegments[i] ? workingSegments[i].end : s.end
-  }));
+  // v2.5: 문장이 합쳐졌으므로 Claude가 반환한 타임스탬프를 신뢰
+  // (Claude는 합쳐진 문장의 시작/끝 범위를 반환)
+  // 유효성 검증만 수행: 범위 벗어나면 안전하게 클램핑
+  const firstSegStart = workingSegments[0]?.start ?? 0;
+  const lastSegEnd = workingSegments[workingSegments.length - 1]?.end ?? 999;
+
+  parsed.sentences = parsed.sentences.map((s) => {
+    let start = typeof s.start === 'number' ? s.start : firstSegStart;
+    let end = typeof s.end === 'number' ? s.end : lastSegEnd;
+    // 안전 장치: 범위 밖이면 클램핑
+    if (start < 0) start = 0;
+    if (end <= start) end = start + 2; // 최소 2초
+    if (start < firstSegStart - 1) start = firstSegStart;
+    if (end > lastSegEnd + 1) end = lastSegEnd;
+    return { ...s, start, end };
+  });
 
   if (isPartial) {
-    parsed.note = `Showing first 30 of ${segments.length} sentences`;
+    parsed.note = `Merged from ${segments.length} raw segments into ${parsed.sentences.length} sentences`;
   }
 
   return parsed;
