@@ -1,11 +1,15 @@
 // ============================================================
-// SnapTalk API v2.3 — Supadata 통합! 🎯
+// SnapTalk API v2.4 — Phonetic (한글 발음) 자동 생성! 🎤
 // ============================================================
 // 작동 순서:
 //   1. Supadata API ⭐ 메인! (Vercel에서도 완벽 작동!)
 //   2. 직접 페이지 파싱 (백업 1)
 //   3. Whisper (백업 2, ytdl 가능 시)
-//   → Claude로 번역 + 교육자료화
+//   → Claude로 번역 + phonetic + 교육자료화
+// ============================================================
+// v2.4 변경사항:
+//   ✨ phonetic 필드 자동 생성 (영어 → 한글 음사)
+//   예: "What do you do?" → "왓 두 유 두?"
 // ============================================================
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -382,8 +386,19 @@ For EACH sentence, provide:
 3. "end": end time in seconds (use the timestamp I gave)
 4. "core": the MOST IMPORTANT content word (noun/verb/adjective only — NO articles like "the", NO pronouns like "I/you", NO be-verbs like "is/are")
 5. "highlight": a 2-4 word collocation containing the core word (e.g., "for a living", "look good", "make sense")
-6. "translations.ko.text": natural conversational Korean translation
-7. "translations.ko.highlight": Korean translation of just the highlight phrase
+6. "phonetic": Korean phonetic transcription (한글 음사) of the English sentence
+   - Write how the English sounds using Korean characters
+   - Keep spaces between English words
+   - Include original punctuation (? ! . , etc.)
+   - Use standard Korean transcription conventions commonly seen in Korean English textbooks
+   - Examples:
+     * "What do you do for a living?" → "왓 두 유 두 포 어 리빙?"
+     * "Are tacos actually better?" → "아 타코스 액츄얼리 베러?"
+     * "Let me try this." → "렛 미 트라이 디스."
+     * "This is amazing!" → "디스 이즈 어메이징!"
+     * "I love it." → "아이 러브 잇."
+7. "translations.ko.text": natural conversational Korean translation
+8. "translations.ko.highlight": Korean translation of just the highlight phrase
 
 Return ONLY valid JSON (no markdown, no explanation, no code blocks):
 
@@ -395,6 +410,7 @@ Return ONLY valid JSON (no markdown, no explanation, no code blocks):
       "end": 2.3,
       "core": "living",
       "highlight": "for a living",
+      "phonetic": "왓 두 유 두 포 어 리빙?",
       "translations": {
         "ko": {
           "text": "직업이 뭐예요?",
