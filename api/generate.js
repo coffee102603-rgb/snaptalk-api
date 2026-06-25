@@ -1,11 +1,26 @@
 // ============================================================
-// SnapTalk API v3.0 — 의미 단위 청크 분절 완벽 강화! 🎯📚
+// SnapTalk API v3.1 — 청크 분절 완전 정복! 주어+동사+관사+조동사 절대 보호 🎯📚
 // ============================================================
 // 작동 순서:
 //   1. Supadata API ⭐ 메인! (Vercel에서도 완벽 작동!)
 //   2. 직접 페이지 파싱 (백업 1)
 //   3. Whisper (백업 2, ytdl 가능 시)
 //   → Claude로 번역 + phonetic + 완전 문장 + 청크 마커
+// ============================================================
+// v3.1 변경사항 (CEO 직접 발견한 문제 + 5가지 새 규칙):
+//   🔥 RULE 4 대폭 강화 — 주어+동사 절대 분리 금지!
+//      BAD: "I | am not doing this" ❌
+//      GOOD: "I am not doing this" ✅
+//   🆕 RULE 6: 조동사+본동사 분리 금지!
+//      BAD: "I will | go" ❌
+//      GOOD: "I will go" ✅
+//   🆕 RULE 7: 최소 청크 길이 (3단어 이상 권장)
+//   🆕 RULE 8: 관사+명사 분리 금지!
+//      BAD: "the | car" ❌
+//      GOOD: "the car" ✅
+//   🆕 RULE 9: 관계대명사/접속사 앞에서 끊기!
+//      GOOD: "the book | that I read" ✅
+//   🎯 12가지 BAD vs GOOD 예시 (기존 6개 + 신규 6개)
 // ============================================================
 // v3.0 변경사항 (특허 #1 기반):
 //   🎯 구동사(phrasal verbs) 절대 분리 금지!
@@ -405,6 +420,7 @@ YOUR JOB:
 
 ═══════════════════════════════════════════════
 🚨 CRITICAL CHUNK RULES (NEVER VIOLATE!) 🚨
+v3.1: 9 RULES (was 5) — More strict, more examples!
 ═══════════════════════════════════════════════
 
 ⛔ RULE 1: NEVER SPLIT PHRASAL VERBS!
@@ -444,13 +460,104 @@ Common standalone adverbs:
 - Honestly / Basically / Obviously
 - Unfortunately / Fortunately
 
-⛔ RULE 4: KEEP SUBJECT+VERB+OBJECT TOGETHER!
-The core S+V+O unit should not be split internally.
+⛔ RULE 4 (CRITICAL!): NEVER SEPARATE SUBJECT FROM VERB!
+🔥 THIS IS THE MOST IMPORTANT RULE 🔥
+The subject pronoun MUST stay with its verb. NO EXCEPTIONS!
+
+BAD examples (NEVER do this!):
+❌ "I | am serious"            (I + am must stay together!)
+❌ "I | am not doing this"     (I + am not must stay together!)
+❌ "He | is happy"             (He + is must stay together!)
+❌ "She | was running"         (She + was must stay together!)
+❌ "They | were tired"         (They + were must stay together!)
+❌ "We | have arrived"         (We + have must stay together!)
+❌ "It | is mine"              (It + is must stay together!)
+❌ "You | are right"           (You + are must stay together!)
+
+GOOD examples:
+✅ "I am serious"               (S+V together)
+✅ "I am not doing this"        (S+V+O together)
+✅ "He is happy"                (S+V+C together)
+✅ "this is the last time. | I am not doing this again."   (split BEFORE I, not after!)
+
+REMEMBER: Pronouns (I, You, He, She, It, We, They) ALWAYS bond with their verb!
+
+⛔ RULE 5: KEEP CORE S+V+O TOGETHER!
+The complete S+V+O unit should not be split internally.
 BAD: "I | do not run out."                 ❌ (subject separated!)
 GOOD: "I do not run out."                  ✅ (kept together)
 GOOD: "I do not run out | of milk."        ✅ (split before prep phrase)
 
-⛔ RULE 5: PREPOSITIONAL PHRASES = ONE CHUNK!
+⛔ RULE 6 (NEW!): NEVER SEPARATE AUXILIARY VERBS FROM MAIN VERBS!
+Modal/auxiliary verbs must stay with their main verb.
+
+BAD examples:
+❌ "I will | go to school"      (will + go must stay together!)
+❌ "She can | swim fast"        (can + swim must stay together!)
+❌ "We have | finished"         (have + finished must stay together!)
+❌ "They might | come back"     (might + come must stay together!)
+❌ "You should | try this"      (should + try must stay together!)
+
+GOOD examples:
+✅ "I will go | to school"      (split BEFORE prep phrase)
+✅ "She can swim | very fast"   (split BEFORE adverb)
+✅ "We have finished | the work" (split BEFORE object)
+
+Auxiliary verbs that must NEVER be separated:
+will / would / can / could / shall / should / may / might / must
+have / has / had / do / does / did / am / is / are / was / were / be / been / being
+
+⛔ RULE 7 (NEW!): MINIMUM CHUNK LENGTH — AVOID TOO-SHORT CHUNKS!
+Each chunk should ideally be 3+ words. Avoid creating 1-2 word chunks unless:
+- It's a sentence-initial interjection (Okay, Yeah, Well)
+- It's a sentence-initial adverb (Hopefully, Actually)
+- It's a deliberate dramatic pause
+
+BAD examples:
+❌ "I | am | not | doing | this"   (way too fragmented!)
+❌ "the | book | is | red"          (every word separated!)
+❌ "He | said | that | he | left"   (no rhythm at all!)
+
+GOOD examples:
+✅ "I am not doing this"
+✅ "the book is red"
+✅ "He said that he left"
+✅ "He said | that he left"   (split before that-clause is OK!)
+
+⛔ RULE 8 (NEW!): NEVER SEPARATE ARTICLES/DETERMINERS FROM NOUNS!
+Articles (the, a, an) and determiners (this, that, these, my, your) bond with their noun.
+
+BAD examples:
+❌ "the | car is fast"           (the + car must stay together!)
+❌ "a | book"                    (a + book must stay together!)
+❌ "this | morning"              (this + morning must stay together!)
+❌ "my | friend"                 (my + friend must stay together!)
+❌ "these | apples"              (these + apples must stay together!)
+
+GOOD examples:
+✅ "the car is fast"
+✅ "a book"
+✅ "this morning | I went out"   (split AFTER the noun phrase, not inside!)
+✅ "my friend | is happy"        (split BEFORE verb is OK)
+
+⛔ RULE 9 (NEW!): BREAK BEFORE RELATIVE PRONOUNS & CONJUNCTIONS!
+Natural break points are BEFORE these connecting words (not inside the main clause).
+
+Break BEFORE (good places to break):
+- that / which / who / whom / whose / where / when
+- and / but / so / because / although / while / if / when
+
+BAD examples:
+❌ "the book that | I read"       (split inside the relative clause)
+❌ "I went out and | met him"     (split right after conjunction)
+
+GOOD examples:
+✅ "the book | that I read"       (split BEFORE that-clause)
+✅ "I went out | and met him"     (split BEFORE conjunction)
+✅ "He left | because he was late" (split BEFORE because-clause)
+✅ "She is the one | who I love"   (split BEFORE who-clause)
+
+⛔ RULE 10: PREPOSITIONAL PHRASES = ONE CHUNK!
 "to/in/on/at/for/with + ..." stay together.
 BAD: "I went to | the store."              ❌ 
 GOOD: "I went | to the store."             ✅
@@ -458,6 +565,7 @@ GOOD: "I went to the store | yesterday."   ✅
 
 ═══════════════════════════════════════════════
 ✅ COMPLETE EXAMPLES — STUDY CAREFULLY!
+12 examples (was 6) — More learning data!
 ═══════════════════════════════════════════════
 
 Example 1 — Interjection + Adverb + Phrasal Verb:
@@ -489,6 +597,38 @@ Example 6 — Squid Game Dalgona:
   en: "It is made by melting down sugar | until it turns caramel color | and then adding | a few pinches of baking soda."
   ko: "설탕을 녹여서 만들어요 | 카라멜 색이 될 때까지 | 그리고 넣어주면 | 베이킹 소다를 몇 꼬집."
 
+🆕 Example 7 — Subject+Verb NEVER SPLIT (MrBeast scene!):
+  ❌ BAD:  "Jimmy, | I am serious, | this is the last time. | I | am not doing this again."
+                                                          ↑ NEVER split I from am!
+  ✅ GOOD: "Jimmy, | I am serious, | this is the last time. | I am not doing this again."
+  Korean:  "지미, | 나 진심이야, | 이번이 마지막이야. | 다시는 안 할 거야."
+  Phonetic:"지미, | 아임 시리어스, | 디스 이즈 더 라스트 타임. | 아임 낫 두잉 디스 어게인."
+
+🆕 Example 8 — Auxiliary Verbs Must Stay Together:
+  ❌ BAD:  "I will | go to the store, | and she can | come too."
+  ✅ GOOD: "I will go | to the store, | and she can come too."
+  Korean:  "나는 갈 거야 | 가게에, | 그리고 그녀도 올 수 있어."
+
+🆕 Example 9 — Articles Stay With Nouns:
+  ❌ BAD:  "the | book on the table | is mine."
+  ✅ GOOD: "the book on the table | is mine."
+  Korean:  "테이블 위의 책은 | 내 거야."
+
+🆕 Example 10 — Break Before Relative Pronoun:
+  ❌ BAD:  "the song that I | love is playing."
+  ✅ GOOD: "the song | that I love | is playing."
+  Korean:  "그 노래 | 내가 좋아하는 | 지금 나오고 있어."
+
+🆕 Example 11 — Break Before Conjunction (not after):
+  ❌ BAD:  "I went out and | met my friend at the park."
+  ✅ GOOD: "I went out | and met my friend | at the park."
+  Korean:  "나는 나갔어 | 그리고 친구를 만났어 | 공원에서."
+
+🆕 Example 12 — Multiple subjects with verbs (each S+V intact):
+  ❌ BAD:  "He | said that she | was happy because they | were together."
+  ✅ GOOD: "He said | that she was happy | because they were together."
+  Korean:  "그가 말했어 | 그녀가 행복하다고 | 왜냐하면 그들이 함께였으니까."
+
 ═══════════════════════════════════════════════
 📝 CHUNK MARKER SYNTAX
 ═══════════════════════════════════════════════
@@ -497,9 +637,16 @@ Example 6 — Squid Game Dalgona:
 - The number of | marks must be IDENTICAL across en, ko, and phonetic
 - Short sentences (1-5 words) need NO markers
 - A 20-word sentence should have 4-6 markers for easy reading
-- Break BEFORE: prepositional phrases, "that/which/and/but/so/because"
+- Break BEFORE: prepositional phrases, "that/which/and/but/so/because", relative pronouns
 - Break AFTER: interjections, sentence-initial adverbs, commas
-- NEVER break: phrasal verbs, articles+noun, possessive+noun
+- NEVER break: phrasal verbs, articles+noun, possessive+noun, subject+verb, aux+main verb
+
+🔥 v3.1 ABSOLUTE PROHIBITIONS (Will get rejected!):
+1. "I | am ..." or any pronoun separated from its verb
+2. "the | car" or any article separated from noun
+3. "will | go" or any auxiliary separated from main verb
+4. "run | out" or any phrasal verb split
+5. Chunks of single words (unless interjection/sentence-initial adverb)
 
 For EACH merged sentence, provide:
 1. "en": Complete English sentence (NO splitting!) with chunk markers per rules above
