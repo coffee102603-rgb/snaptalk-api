@@ -1,5 +1,5 @@
 // ============================================================
-// SnapTalk API v2.6 — 완전한 문장 + 촘촘한 청크 마커! 📚🎯
+// SnapTalk API v3.0 — 의미 단위 청크 분절 완벽 강화! 🎯📚
 // ============================================================
 // 작동 순서:
 //   1. Supadata API ⭐ 메인! (Vercel에서도 완벽 작동!)
@@ -7,15 +7,23 @@
 //   3. Whisper (백업 2, ytdl 가능 시)
 //   → Claude로 번역 + phonetic + 완전 문장 + 청크 마커
 // ============================================================
+// v3.0 변경사항 (특허 #1 기반):
+//   🎯 구동사(phrasal verbs) 절대 분리 금지!
+//      예: run out, pick up, look for, find out, give up
+//   🎯 감탄사/대답어 독립 청크 명시!
+//      예: Okay. | Yeah | Well | Oh | Wow
+//   🎯 부사 독립 청크 강화!
+//      예: Hopefully | Actually | Suddenly | Finally
+//   🎯 잘못된 예시 (BAD examples) 추가로 AI 학습 강화!
+//   🎯 의미 단위 우선 — 통사적 분절보다 의미적 분절!
+// ============================================================
 // v2.6 변경사항:
 //   ✨ 문장 길이 제한 없음 — 의미 완결성 우선!
 //   ✨ 긴 문장도 나누지 말고 한 통으로 유지
 //   ✨ 대신 촘촘한 청크 마커 (3-6 단어마다)
-//   ✨ 호흡 단위 = 자연스러운 pause 지점 = TOEIC 끊어읽기!
 // v2.5 변경사항:
 //   ✨ 짧은 segments를 맥락상 완전한 문장으로 합침
 //   ✨ 청크(끊어읽기 단위)에 | 마커 삽입
-//   ✨ 영어/한글/phonetic 모두 같은 위치에 | 마커
 // v2.4 변경사항:
 //   ✨ phonetic 필드 자동 생성 (영어 → 한글 음사)
 // ============================================================
@@ -391,48 +399,114 @@ ${segmentsText}
 YOUR JOB:
 1. MERGE these short segments into COMPLETE, meaningful English sentences.
 2. DO NOT split long sentences — keep them WHOLE even if lengthy (that's the WHOLE POINT for learning!).
-3. Add chunk markers "|" at natural reading/breath breaks FREQUENTLY (every 3-6 words).
+3. Add chunk markers "|" at MEANINGFUL breath/pause points (every 3-6 words).
 4. Provide Korean translation with SAME chunk markers at matching positions.
 5. Provide phonetic (Korean pronunciation) with SAME chunk markers at matching positions.
 
-CRITICAL RULES ABOUT SENTENCE LENGTH:
-- Long sentences are GOOD — they preserve real meaning and force learners to think in English.
-- Example: "$250 a night so it's not cheap but to have the whole experience walking through the Princess Cruise's 12-day Vancouver-to-Alaska voyage it's absolutely worth it"
-  → KEEP as ONE sentence with MANY chunk markers!
-- NEVER cut a complete thought into 2+ sentences just because it's long.
-- The chunk markers (|) let learners read it comfortably despite length.
+═══════════════════════════════════════════════
+🚨 CRITICAL CHUNK RULES (NEVER VIOLATE!) 🚨
+═══════════════════════════════════════════════
 
-CHUNK MARKER RULES (VERY IMPORTANT):
-- Use " | " (space-pipe-space) between chunks
-- A chunk = natural breath unit, typically 3-6 words (be GENEROUS with markers!)
-- Break at: after subject, before verbs/objects, before prepositional phrases, before "that/which/and/but/so", after commas
-- The number of | marks must be IDENTICAL across en, ko, and phonetic
-- Short sentences (1-5 words) need NO markers
-- A 20-word sentence should have 4-6 markers for easy reading
+⛔ RULE 1: NEVER SPLIT PHRASAL VERBS!
+Phrasal verbs are TWO-word verbs where the second word changes meaning.
+BAD: "I do not run | out."   ❌ (split!)
+GOOD: "I do not run out."    ✅ (kept together!)
 
-EXAMPLES:
+Common phrasal verbs (NEVER split these):
+- run out (다 떨어지다)      - pick up (집어들다)
+- look for (찾다)            - find out (알아내다)
+- give up (포기하다)         - turn on/off (켜다/끄다)
+- get up (일어나다)          - sit down (앉다)
+- come back (돌아오다)       - go away (가버리다)
+- take off (벗다/이륙)       - put on (입다)
+- show up (나타나다)         - work out (운동/잘되다)
+- check out (확인하다)       - hang out (놀다)
+- end up (결국~되다)         - figure out (알아내다)
 
-Short → no markers:
+⛔ RULE 2: INTERJECTIONS = STANDALONE CHUNKS!
+Interjections/response words MUST be their own chunk.
+BAD: "Okay. Hopefully I do not run out."           ❌ (no markers!)
+GOOD: "Okay. | Hopefully | I do not run out."      ✅ (3 chunks!)
+
+Common interjections (always standalone):
+- Okay / OK              - Yeah / Yes / Yep
+- Well / Hmm             - Oh / Wow / Hey
+- Right / Sure / Alright - Actually / Honestly
+
+⛔ RULE 3: ADVERBS OFTEN STAND ALONE!
+Sentence-initial adverbs are independent chunks.
+BAD: "Hopefully I do not run out."         ❌ 
+GOOD: "Hopefully | I do not run out."      ✅
+
+Common standalone adverbs:
+- Hopefully / Actually / Surprisingly
+- Finally / Suddenly / Eventually
+- Honestly / Basically / Obviously
+- Unfortunately / Fortunately
+
+⛔ RULE 4: KEEP SUBJECT+VERB+OBJECT TOGETHER!
+The core S+V+O unit should not be split internally.
+BAD: "I | do not run out."                 ❌ (subject separated!)
+GOOD: "I do not run out."                  ✅ (kept together)
+GOOD: "I do not run out | of milk."        ✅ (split before prep phrase)
+
+⛔ RULE 5: PREPOSITIONAL PHRASES = ONE CHUNK!
+"to/in/on/at/for/with + ..." stay together.
+BAD: "I went to | the store."              ❌ 
+GOOD: "I went | to the store."             ✅
+GOOD: "I went to the store | yesterday."   ✅
+
+═══════════════════════════════════════════════
+✅ COMPLETE EXAMPLES — STUDY CAREFULLY!
+═══════════════════════════════════════════════
+
+Example 1 — Interjection + Adverb + Phrasal Verb:
+  ❌ BAD:  "Okay. Hopefully I do not run | out."
+  ✅ GOOD: "Okay. | Hopefully | I do not run out."
+  Korean:  "오케이. | 다행히 | 다 떨어지지 않길 바라."
+  Phonetic:"오케이. | 호프풀리 | 아이 두 낫 런 아웃."
+
+Example 2 — Multiple Phrasal Verbs:
+  ❌ BAD:  "I need to look | for my keys and pick | them up."
+  ✅ GOOD: "I need to look for my keys | and pick them up."
+  Korean:  "내 열쇠를 찾아야 해 | 그리고 집어들어야 해."
+
+Example 3 — Short sentence (no markers needed):
   en: "What is this?"
   ko: "이게 뭐예요?"
-  phonetic: "왓 이즈 디스?"
 
-Medium → 1-2 markers:
-  en: "I went to the store | yesterday."
-  ko: "저는 가게에 갔어요 | 어제요."
-  phonetic: "아이 웬트 투 더 스토어 | 예스터데이."
+Example 4 — Medium sentence (1-2 markers):
+  en: "I went to the store | yesterday afternoon."
+  ko: "저는 가게에 갔어요 | 어제 오후에."
+  phonetic: "아이 웬트 투 더 스토어 | 예스터데이 애프터눈."
 
-Long → MANY markers (KEEP AS ONE SENTENCE!):
+Example 5 — Long sentence (MANY markers, KEEP AS ONE!):
   en: "$250 a night, | so it's not cheap, | but to have the whole experience, | walking through the entire ship, | it's absolutely worth it."
   ko: "하루에 $250이라서, | 싸진 않지만, | 전체 경험을 해보고, | 배 전체를 둘러보기엔, | 정말 가치 있어요."
   phonetic: "투 헌드레드 피프티 어 나잇, | 쏘 잇츠 낫 칩, | 벗 투 해브 더 홀 익스피리언스, | 워킹 쓰루 디 엔타이어 쉽, | 잇츠 앱솔루틀리 워쓰 잇."
 
+Example 6 — Squid Game Dalgona:
+  en: "It is made by melting down sugar | until it turns caramel color | and then adding | a few pinches of baking soda."
+  ko: "설탕을 녹여서 만들어요 | 카라멜 색이 될 때까지 | 그리고 넣어주면 | 베이킹 소다를 몇 꼬집."
+
+═══════════════════════════════════════════════
+📝 CHUNK MARKER SYNTAX
+═══════════════════════════════════════════════
+- Use " | " (space-pipe-space) between chunks
+- A chunk = natural breath unit, typically 3-6 words (be GENEROUS!)
+- The number of | marks must be IDENTICAL across en, ko, and phonetic
+- Short sentences (1-5 words) need NO markers
+- A 20-word sentence should have 4-6 markers for easy reading
+- Break BEFORE: prepositional phrases, "that/which/and/but/so/because"
+- Break AFTER: interjections, sentence-initial adverbs, commas
+- NEVER break: phrasal verbs, articles+noun, possessive+noun
+
 For EACH merged sentence, provide:
-1. "en": Complete English sentence (NO splitting!) with frequent | markers
+1. "en": Complete English sentence (NO splitting!) with chunk markers per rules above
 2. "start": Start time (of the first original segment merged)
 3. "end": End time (of the last original segment merged)
-4. "core": MOST IMPORTANT content word (noun/verb/adjective only — NO articles, NO pronouns, NO be-verbs)
-5. "highlight": A 2-4 word collocation containing the core word
+4. "core": MOST IMPORTANT content word (noun/verb/adjective only — NO articles, NO pronouns, NO be-verbs, NO interjections like "Okay")
+5. "highlight": A 2-4 word collocation containing the core word (if phrasal verb, include BOTH words!)
 6. "phonetic": Korean phonetic with SAME | markers as "en" (standard textbook transcription)
 7. "translations.ko.text": Natural Korean with SAME | markers as "en"
 8. "translations.ko.highlight": Korean translation of just the highlight
@@ -442,16 +516,16 @@ Return ONLY valid JSON (no markdown, no code blocks, no explanation):
 {
   "sentences": [
     {
-      "en": "I work in finance | downtown | near the station.",
-      "start": 0.5,
-      "end": 3.2,
-      "core": "finance",
-      "highlight": "work in finance",
-      "phonetic": "아이 워크 인 파이낸스 | 다운타운 | 니어 더 스테이션.",
+      "en": "Okay. | Hopefully | I do not run out.",
+      "start": 37.4,
+      "end": 38.8,
+      "core": "run out",
+      "highlight": "run out",
+      "phonetic": "오케이. | 호프풀리 | 아이 두 낫 런 아웃.",
       "translations": {
         "ko": {
-          "text": "저는 금융 일을 해요 | 다운타운에서 | 역 근처에요.",
-          "highlight": "금융 일을 해요"
+          "text": "오케이. | 다행히 | 다 떨어지지 않길 바라.",
+          "highlight": "다 떨어지다"
         }
       }
     }
