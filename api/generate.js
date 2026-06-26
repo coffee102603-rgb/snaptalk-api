@@ -142,7 +142,7 @@ export default async function handler(req, res) {
     // ========================================
     console.log('  4️⃣ Generating lesson with Claude...');
     // v3.2: 긴 영상 504 타임아웃 방지 — 최대 35개 segments만 처리
-    const MAX_SEGMENTS = 20;
+    const MAX_SEGMENTS = 15;
     let segmentsToProcess = segments;
     if (segments.length > MAX_SEGMENTS) {
       console.log(`  ✂️ 긴 영상! ${segments.length}개 → 앞 ${MAX_SEGMENTS}개만 처리`);
