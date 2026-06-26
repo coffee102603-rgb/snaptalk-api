@@ -141,7 +141,14 @@ export default async function handler(req, res) {
     // STEP 4: Claude로 번역 + 교육자료화
     // ========================================
     console.log('  4️⃣ Generating lesson with Claude...');
-    const lesson = await generateLessonWithClaude(segments);
+    // v3.2: 긴 영상 504 타임아웃 방지 — 최대 35개 segments만 처리
+    const MAX_SEGMENTS = 35;
+    let segmentsToProcess = segments;
+    if (segments.length > MAX_SEGMENTS) {
+      console.log(`  ✂️ 긴 영상! ${segments.length}개 → 앞 ${MAX_SEGMENTS}개만 처리`);
+      segmentsToProcess = segments.slice(0, MAX_SEGMENTS);
+    }
+    const lesson = await generateLessonWithClaude(segmentsToProcess);
     console.log(`  ✅ Lesson generated: ${lesson.sentences.length} sentences`);
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
