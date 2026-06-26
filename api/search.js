@@ -150,8 +150,8 @@ export default async function handler(req, res) {
     searchUrl.searchParams.set('q', query);
     searchUrl.searchParams.set('type', 'video');
     searchUrl.searchParams.set('videoDuration', 'short'); // ~4분 이하
-    searchUrl.searchParams.set('videoCaption', 'closedCaption'); // ⭐ 자막 필수!
-    searchUrl.searchParams.set('maxResults', '30');
+    searchUrl.searchParams.set('videoCaption', 'any'); // ⭐ 자막 필수!
+    searchUrl.searchParams.set('maxResults', '50');
     searchUrl.searchParams.set('order', 'viewCount');
     searchUrl.searchParams.set('regionCode', region === 'kr' ? 'KR' : 'US');
     searchUrl.searchParams.set('relevanceLanguage', region === 'kr' ? 'ko' : 'en');
@@ -221,7 +221,7 @@ export default async function handler(req, res) {
         };
       })
       .filter(v => {
-        if (v.duration < 10 || v.duration > 90) return false; // 10~90초만
+        if (v.duration < 8 || v.duration > 180) return false; // 10~90초만
         if (v.viewCount < minViews) return false;
         if (isBlockedContent(v.title, v.description)) return false;
         return true;
