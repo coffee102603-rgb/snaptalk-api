@@ -12,7 +12,7 @@ const SEARCH_QUERIES = {
     shopping: ['shopping haul shorts', 'costco shorts', 'target haul shorts'],
     fun: ['funny english shorts', 'challenge shorts english', 'reaction shorts english'],
     cars: ['car review shorts', 'unboxing shorts english', 'gadget review shorts'],
-    work: ['business english shorts', 'job interview shorts', 'office english shorts'],
+    work: ['business english shorts', 'job interview shorts', 'english conversation shorts', 'learn english speaking shorts', 'english pronunciation shorts', 'self introduction interview shorts', 'ielts speaking shorts', 'english phrases shorts', 'daily english shorts'],
     culture: ['american culture shorts english']
   },
   kr: {
@@ -30,10 +30,10 @@ const SEARCH_QUERIES = {
 
 // 카테고리별 최소 조회수 기준
 const MIN_VIEWS = {
-  food: 500000, fun: 500000, culture: 500000,
-  people: 200000, places: 200000,
-  shopping: 100000, home: 100000, cars: 100000,
-  work: 50000
+  food: 10000, fun: 10000, culture: 10000,
+  people: 10000, places: 10000,
+  shopping: 10000, home: 10000, cars: 10000,
+  work: 10000
 };
 
 // ISO 8601 duration (PT1M15S) → 초 변환
