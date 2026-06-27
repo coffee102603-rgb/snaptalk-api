@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     
     /* Claude API 호출 (Sonnet 4.5 - 빠르고 정확) */
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-haiku-4-5',
       max_tokens: Math.min(maxTokens, 200),  /* 대화는 짧게! */
       system: system || 'You are a friendly English conversation partner for Korean learners. Keep responses short (1-2 sentences, under 15 words) and encouraging.',
       messages: messages
