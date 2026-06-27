@@ -5,10 +5,10 @@
 // 9개 카테고리 × 지역별 검색 키워드 매트릭스
 const SEARCH_QUERIES = {
   us: {
-    food: ['street food shorts', 'food review shorts english', 'mukbang shorts english', 'cooking shorts english'],
+    food: ['street food shorts', 'food review shorts english', 'mukbang shorts english', 'cooking shorts english', 'korean food foreigner english', 'eating korean food english', 'korean street food english', 'trying korean food english'],
     people: ['street interview shorts', 'asking strangers shorts', 'couples Q&A shorts'],
     home: ['morning routine shorts', 'day in my life shorts', 'pet shorts english'],
-    places: ['travel shorts usa', 'hotel tour shorts', 'city tour shorts english'],
+    places: ['travel shorts usa', 'hotel tour shorts', 'city tour shorts english', 'korea travel vlog english', 'seoul travel english', 'foreigner in korea english', 'visiting korea english'],
     shopping: ['shopping haul shorts', 'costco shorts', 'target haul shorts'],
     fun: ['funny english shorts', 'challenge shorts english', 'reaction shorts english'],
     cars: ['car review shorts', 'unboxing shorts english', 'gadget review shorts'],
