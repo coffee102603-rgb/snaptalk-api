@@ -14,7 +14,7 @@ const SEARCH_QUERIES = {
     cars: ['american car review', 'unboxing shorts usa', 'gadget review usa', 'amazon gadgets usa'],
     work: ['business english shorts', 'job interview shorts', 'english conversation shorts', 'learn english speaking shorts', 'english pronunciation shorts', 'self introduction interview shorts', 'ielts speaking shorts', 'english phrases shorts', 'daily english shorts'],
     culture: ['american culture shorts', 'british culture shorts', 'american slang shorts', 'life in america shorts'],
-    travel_english: ['travel english conversation', 'english at the airport', 'hotel check in english', 'restaurant english ordering', 'ordering coffee in english', 'asking for directions english', 'shopping english phrases']
+    travel_english: ['english at the airport', 'hotel check in english', 'restaurant english ordering', 'ordering coffee in english', 'asking for directions english', 'english at the bank', 'doctor appointment english', 'pharmacy english conversation', 'renting apartment english', 'airport immigration english', 'taxi english conversation', 'subway directions english', 'english role play conversation', 'real life english conversation', 'english conversation for travelers']
   },
   kr: {
     culture: ['kpop shorts english', 'kdrama shorts english', 'kbeauty shorts english', 'hallyu shorts'],
