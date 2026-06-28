@@ -5,17 +5,18 @@
 // 9개 카테고리 × 지역별 검색 키워드 매트릭스
 const SEARCH_QUERIES = {
   us: {
-    food: ['american street food shorts', 'street food usa', 'food review usa', 'british street food shorts', 'american mukbang shorts', 'american cooking shorts', 'korean food foreigner english', 'eating korean food english', 'korean street food english', 'trying korean food english'],
-    people: ['american street interview', 'english conversation usa', 'american vlog talking', 'storytime shorts american', 'american explains shorts'],
-    home: ['american morning routine', 'day in my life usa', 'american family vlog', 'british daily routine'],
-    places: ['american campus tour', 'university tour usa', 'restaurant review usa', 'new york walking tour', 'visiting new york', 'american landmark tour', 'american traveling abroad', 'travel vlog american', 'solo travel vlog english', 'backpacking vlog english', 'korea travel vlog english', 'seoul travel english', 'visiting korea english'],
-    shopping: ['american shopping haul', 'costco haul shorts', 'target haul shorts', 'walmart haul shorts', 'amazon haul usa'],
-    fun: ['funny american shorts', 'american challenge shorts', 'british comedy shorts', 'american reaction shorts'],
-    cars: ['american car review', 'unboxing shorts usa', 'gadget review usa', 'amazon gadgets usa'],
-    work: ['business english shorts', 'job interview shorts', 'english conversation shorts', 'learn english speaking shorts', 'english pronunciation shorts', 'self introduction interview shorts', 'ielts speaking shorts', 'english phrases shorts', 'daily english shorts'],
-    culture: ['american culture shorts', 'british culture shorts', 'american slang shorts', 'life in america shorts'],
+    food: ['what i eat in a day usa', 'american food review vlog', 'cooking vlog american', 'street food vlog usa', 'korean food foreigner english', 'trying korean food english', 'korean street food english'],
+    people: ['american vlog talking', 'storytime shorts american', 'american explains', 'day in my life student usa', 'get ready with me american', 'english conversation usa'],
+    home: ['day in my life usa', 'day in my life new york', 'american apartment tour', 'grocery shopping vlog usa', 'american morning routine', 'living in america vlog'],
+    places: ['tokyo travel vlog', 'japan travel vlog english', 'paris walking tour', 'italy travel vlog english', 'europe travel vlog english', 'american traveling abroad', 'new york walking tour', 'los angeles travel vlog', 'korea travel vlog english', 'seoul travel english', 'visiting korea english'],
+    shopping: ['american shopping haul', 'costco haul vlog', 'target haul shorts', 'what i bought haul usa', 'amazon must haves usa'],
+    fun: ['english idioms explained', 'american slang explained', 'english expressions explained', 'common english mistakes'],
+    cars: ['product review vlog usa', 'tech review vlog american', 'what is in my bag usa'],
+    work: ['job interview english conversation', 'business english conversation', 'english role play office', 'self introduction english', 'english phrases for work'],
+    culture: ['life in america vlog', 'american culture explained', 'moving to america vlog'],
     travel_english: ['english at the airport', 'hotel check in english', 'restaurant english ordering', 'ordering coffee in english', 'asking for directions english', 'english at the bank', 'doctor appointment english', 'pharmacy english conversation', 'renting apartment english', 'airport immigration english', 'taxi english conversation', 'subway directions english', 'english role play conversation', 'real life english conversation', 'english conversation for travelers']
   },
+
   kr: {
     culture: ['kpop shorts english', 'kdrama shorts english', 'kbeauty shorts english', 'hallyu shorts'],
     food: ['korean street food shorts', 'korean mukbang shorts', 'korean cooking shorts'],
