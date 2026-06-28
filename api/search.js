@@ -5,15 +5,15 @@
 // 9개 카테고리 × 지역별 검색 키워드 매트릭스
 const SEARCH_QUERIES = {
   us: {
-    food: ['street food shorts', 'food review shorts english', 'mukbang shorts english', 'cooking shorts english', 'korean food foreigner english', 'eating korean food english', 'korean street food english', 'trying korean food english'],
-    people: ['street interview shorts', 'asking strangers shorts', 'couples Q&A shorts'],
-    home: ['morning routine shorts', 'day in my life shorts', 'pet shorts english'],
-    places: ['travel shorts usa', 'hotel tour shorts', 'city tour shorts english', 'korea travel vlog english', 'seoul travel english', 'foreigner in korea english', 'visiting korea english'],
-    shopping: ['shopping haul shorts', 'costco shorts', 'target haul shorts'],
-    fun: ['funny english shorts', 'challenge shorts english', 'reaction shorts english'],
-    cars: ['car review shorts', 'unboxing shorts english', 'gadget review shorts'],
+    food: ['american street food shorts', 'street food usa', 'food review usa', 'british street food shorts', 'american mukbang shorts', 'american cooking shorts', 'korean food foreigner english', 'eating korean food english', 'korean street food english', 'trying korean food english'],
+    people: ['american street interview', 'street interview usa', 'london street interview', 'asking americans shorts', 'australian street interview'],
+    home: ['american morning routine', 'day in my life usa', 'american family vlog', 'british daily routine'],
+    places: ['travel shorts usa', 'american city tour', 'london travel shorts', 'australia travel shorts', 'new york travel shorts', 'korea travel vlog english', 'seoul travel english', 'foreigner in korea english', 'visiting korea english'],
+    shopping: ['american shopping haul', 'costco haul shorts', 'target haul shorts', 'walmart haul shorts', 'amazon haul usa'],
+    fun: ['funny american shorts', 'american challenge shorts', 'british comedy shorts', 'american reaction shorts'],
+    cars: ['american car review', 'unboxing shorts usa', 'gadget review usa', 'amazon gadgets usa'],
     work: ['business english shorts', 'job interview shorts', 'english conversation shorts', 'learn english speaking shorts', 'english pronunciation shorts', 'self introduction interview shorts', 'ielts speaking shorts', 'english phrases shorts', 'daily english shorts'],
-    culture: ['american culture shorts english']
+    culture: ['american culture shorts', 'british culture shorts', 'american slang shorts', 'life in america shorts']
   },
   kr: {
     culture: ['kpop shorts english', 'kdrama shorts english', 'kbeauty shorts english', 'hallyu shorts'],
