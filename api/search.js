@@ -6,7 +6,7 @@
 const SEARCH_QUERIES = {
   us: {
     food: ['american street food shorts', 'street food usa', 'food review usa', 'british street food shorts', 'american mukbang shorts', 'american cooking shorts', 'korean food foreigner english', 'eating korean food english', 'korean street food english', 'trying korean food english'],
-    people: ['american street interview', 'street interview usa', 'london street interview', 'asking americans shorts', 'australian street interview'],
+    people: ['american street interview', 'english conversation usa', 'american vlog talking', 'storytime shorts american', 'american explains shorts'],
     home: ['american morning routine', 'day in my life usa', 'american family vlog', 'british daily routine'],
     places: ['travel shorts usa', 'american city tour', 'london travel shorts', 'australia travel shorts', 'new york travel shorts', 'korea travel vlog english', 'seoul travel english', 'foreigner in korea english', 'visiting korea english'],
     shopping: ['american shopping haul', 'costco haul shorts', 'target haul shorts', 'walmart haul shorts', 'amazon haul usa'],
@@ -150,7 +150,7 @@ export default async function handler(req, res) {
     searchUrl.searchParams.set('q', query);
     searchUrl.searchParams.set('type', 'video');
     searchUrl.searchParams.set('videoDuration', 'short'); // ~4분 이하
-    searchUrl.searchParams.set('videoCaption', 'any'); // ⭐ 자막 필수!
+    searchUrl.searchParams.set('videoCaption', 'closedCaption'); // ⭐ 자막 있는 영상만!
     searchUrl.searchParams.set('maxResults', '50');
     searchUrl.searchParams.set('order', 'viewCount');
     searchUrl.searchParams.set('regionCode', region === 'kr' ? 'KR' : 'US');
