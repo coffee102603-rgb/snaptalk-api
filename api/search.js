@@ -8,7 +8,7 @@ const SEARCH_QUERIES = {
     food: ['american street food shorts', 'street food usa', 'food review usa', 'british street food shorts', 'american mukbang shorts', 'american cooking shorts', 'korean food foreigner english', 'eating korean food english', 'korean street food english', 'trying korean food english'],
     people: ['american street interview', 'english conversation usa', 'american vlog talking', 'storytime shorts american', 'american explains shorts'],
     home: ['american morning routine', 'day in my life usa', 'american family vlog', 'british daily routine'],
-    places: ['travel shorts usa', 'american city tour', 'london travel shorts', 'australia travel shorts', 'new york travel shorts', 'korea travel vlog english', 'seoul travel english', 'foreigner in korea english', 'visiting korea english'],
+    places: ['american campus tour', 'university tour usa', 'restaurant review usa', 'american restaurant tour', 'new york walking tour', 'visiting new york', 'american landmark tour', 'korea travel vlog english', 'seoul travel english', 'visiting korea english'],
     shopping: ['american shopping haul', 'costco haul shorts', 'target haul shorts', 'walmart haul shorts', 'amazon haul usa'],
     fun: ['funny american shorts', 'american challenge shorts', 'british comedy shorts', 'american reaction shorts'],
     cars: ['american car review', 'unboxing shorts usa', 'gadget review usa', 'amazon gadgets usa'],
