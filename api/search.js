@@ -13,7 +13,8 @@ const SEARCH_QUERIES = {
     fun: ['funny american shorts', 'american challenge shorts', 'british comedy shorts', 'american reaction shorts'],
     cars: ['american car review', 'unboxing shorts usa', 'gadget review usa', 'amazon gadgets usa'],
     work: ['business english shorts', 'job interview shorts', 'english conversation shorts', 'learn english speaking shorts', 'english pronunciation shorts', 'self introduction interview shorts', 'ielts speaking shorts', 'english phrases shorts', 'daily english shorts'],
-    culture: ['american culture shorts', 'british culture shorts', 'american slang shorts', 'life in america shorts']
+    culture: ['american culture shorts', 'british culture shorts', 'american slang shorts', 'life in america shorts'],
+    travel_english: ['travel english conversation', 'english at the airport', 'hotel check in english', 'restaurant english ordering', 'ordering coffee in english', 'asking for directions english', 'shopping english phrases']
   },
   kr: {
     culture: ['kpop shorts english', 'kdrama shorts english', 'kbeauty shorts english', 'hallyu shorts'],
@@ -33,7 +34,7 @@ const MIN_VIEWS = {
   food: 10000, fun: 10000, culture: 10000,
   people: 10000, places: 10000,
   shopping: 10000, home: 10000, cars: 10000,
-  work: 10000
+  work: 10000, travel_english: 10000
 };
 
 // ISO 8601 duration (PT1M15S) → 초 변환
