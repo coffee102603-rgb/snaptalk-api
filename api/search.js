@@ -169,6 +169,7 @@ export default async function handler(req, res) {
     if (region !== 'kr') {
       searchUrl.searchParams.set('videoCaption', 'closedCaption');
     } // ⭐ 자막 있는 영상만!
+    searchUrl.searchParams.set('videoLicense', 'creativeCommon'); // ⚖️ CC 라이선스 영상만! (합법 재사용)
     searchUrl.searchParams.set('maxResults', '50');
     searchUrl.searchParams.set('order', 'viewCount');
     searchUrl.searchParams.set('regionCode', region === 'kr' ? 'KR' : 'US');
