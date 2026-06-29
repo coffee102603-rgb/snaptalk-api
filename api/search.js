@@ -95,9 +95,20 @@ function scoreEducation(video) {
 
 // 저작권 안전도 (공식 채널일수록 위험, 개인 크리에이터 안전)
 function scoreSafety(channelTitle, description) {
-  const danger = ['netflix', 'disney', 'pixar', 'warner', 'universal', 'sony pictures', 'tv show', 'movie clip', 'official trailer'];
+  const danger = [
+    // 글로벌 방송/영화사
+    'netflix', 'disney', 'pixar', 'warner', 'universal', 'sony pictures',
+    'paramount', 'hbo', 'marvel', 'dreamworks',
+    'tv show', 'movie clip', 'official trailer', 'full episode', 'official mv',
+    'music video', 'official video', 'lyrics video',
+    // 한국 방송사/기획사 (드라마/예능/K-pop MV 저작권)
+    'kbs', 'mbc', 'sbs', 'tvn', 'jtbc', 'ocn', 'ena',
+    'hybe', 'sm entertainment', 'jyp', 'yg entertainment', 'starship',
+    '드라마', '예능', '뮤직비디오', '공식 영상', '하이라이트',
+    '본방', '재방송', '풀버전', 'mv', 'official', '방송분'
+  ];
   const text = (channelTitle + ' ' + description).toLowerCase();
-  if (danger.some(kw => text.includes(kw))) return 40;
+  if (danger.some(kw => text.includes(kw))) return 5;  // 저작권 위험 = 강한 감점
   return 90;
 }
 
@@ -154,9 +165,6 @@ export default async function handler(req, res) {
     searchUrl.searchParams.set('q', query);
     searchUrl.searchParams.set('type', 'video');
     searchUrl.searchParams.set('videoDuration', 'short'); // ~4분 이하
-    // ⚖️ 저작권 안전: 크리에이티브 커먼즈(CC) 라이선스 영상만!
-    //    → 더빙/자막 활용이 합법적인 영상만 검색됨
-    searchUrl.searchParams.set('videoLicense', 'creativeCommon');
     // 자막 제약: 미국(영어)은 자막 필수, 한국은 완화 (한국어 영상은 자막 적음)
     if (region !== 'kr') {
       searchUrl.searchParams.set('videoCaption', 'closedCaption');
@@ -242,6 +250,7 @@ export default async function handler(req, res) {
         educationScore: scoreEducation(v),
         safetyScore: scoreSafety(v.channelTitle, v.description)
       }))
+      .filter(v => v.safetyScore >= 50)  // ⚖️ 저작권 위험(방송/영화/MV) 영상 제외
       .sort((a, b) => {
         // 종합 점수순 정렬: 교육점수 + 안전점수 + 조회수 보너스
         const scoreA = a.educationScore + a.safetyScore + Math.log10(a.viewCount + 1) * 5;
