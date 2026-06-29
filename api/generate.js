@@ -62,10 +62,12 @@ export default async function handler(req, res) {
   const startTime = Date.now();
 
   try {
-    const { videoUrl } = req.body || {};
+    const { videoUrl, region = 'us' } = req.body || {};
     if (!videoUrl) {
       return res.status(400).json({ error: 'videoUrl is required' });
     }
+    const isKorean = region === 'kr';
+    console.log('  🌐 Region:', region, isKorean ? '(한국어 학습 모드)' : '(영어 학습 모드)');
 
     const videoId = extractVideoId(videoUrl);
     if (!videoId) {
@@ -83,7 +85,7 @@ export default async function handler(req, res) {
     // ========================================
     try {
       console.log('  1️⃣ Trying Supadata API...');
-      segments = await fetchViaSupadata(videoUrl);
+      segments = await fetchViaSupadata(videoUrl, isKorean);
       if (segments && segments.length > 0) {
         source = 'supadata';
         console.log(`  ✅ Supadata: ${segments.length} segments`);
@@ -99,7 +101,7 @@ export default async function handler(req, res) {
     if (!segments || segments.length === 0) {
       try {
         console.log('  2️⃣ Trying direct caption parse...');
-        segments = await fetchViaDirectParse(videoId);
+        segments = await fetchViaDirectParse(videoId, isKorean);
         if (segments && segments.length > 0) {
           source = 'direct-parse';
           console.log(`  ✅ Direct parse: ${segments.length} segments`);
@@ -116,7 +118,7 @@ export default async function handler(req, res) {
     if (!segments || segments.length === 0) {
       try {
         console.log('  3️⃣ Trying Whisper (may fail due to YouTube bot detection)...');
-        segments = await transcribeWithWhisper(videoUrl);
+        segments = await transcribeWithWhisper(videoUrl, isKorean);
         source = 'whisper';
         console.log(`  ✅ Whisper: ${segments.length} segments`);
       } catch (e) {
@@ -148,7 +150,7 @@ export default async function handler(req, res) {
       console.log(`  ✂️ 긴 영상! ${segments.length}개 → 앞 ${MAX_SEGMENTS}개만 처리`);
       segmentsToProcess = segments.slice(0, MAX_SEGMENTS);
     }
-    const lesson = await generateLessonWithClaude(segmentsToProcess);
+    const lesson = await generateLessonWithClaude(segmentsToProcess, isKorean);
     console.log(`  ✅ Lesson generated: ${lesson.sentences.length} sentences`);
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -189,7 +191,7 @@ function extractVideoId(url) {
 // ============================================================
 // STEP 1: Supadata API ⭐
 // ============================================================
-async function fetchViaSupadata(videoUrl) {
+async function fetchViaSupadata(videoUrl, isKorean = false) {
   if (!process.env.SUPADATA_API_KEY) {
     throw new Error('SUPADATA_API_KEY not configured');
   }
@@ -199,7 +201,7 @@ async function fetchViaSupadata(videoUrl) {
   // mode: 'auto' = 수동 자막 먼저, 없으면 AI 생성
   const result = await supadata.transcript({
     url: videoUrl,
-    lang: 'en',
+    lang: isKorean ? 'ko' : 'en',
     mode: 'auto'
   });
 
@@ -268,7 +270,7 @@ function convertSupadataToSegments(content) {
 // ============================================================
 // STEP 2: 직접 페이지 파싱 (백업)
 // ============================================================
-async function fetchViaDirectParse(videoId) {
+async function fetchViaDirectParse(videoId, isKorean = false) {
   const pageUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const response = await fetch(pageUrl, {
     headers: {
@@ -298,17 +300,26 @@ async function fetchViaDirectParse(videoId) {
     throw new Error('Empty caption tracks');
   }
 
-  const englishTrack =
-    tracks.find(t => (t.languageCode === 'en' || t.languageCode === 'en-US') && t.kind !== 'asr') ||
-    tracks.find(t => t.languageCode === 'en' || t.languageCode === 'en-US') ||
-    tracks.find(t => t.languageCode && t.languageCode.startsWith('en')) ||
-    tracks[0];
+  let chosenTrack;
+  if (isKorean) {
+    chosenTrack =
+      tracks.find(t => (t.languageCode === 'ko' || t.languageCode === 'ko-KR') && t.kind !== 'asr') ||
+      tracks.find(t => t.languageCode === 'ko' || t.languageCode === 'ko-KR') ||
+      tracks.find(t => t.languageCode && t.languageCode.startsWith('ko')) ||
+      tracks[0];
+  } else {
+    chosenTrack =
+      tracks.find(t => (t.languageCode === 'en' || t.languageCode === 'en-US') && t.kind !== 'asr') ||
+      tracks.find(t => t.languageCode === 'en' || t.languageCode === 'en-US') ||
+      tracks.find(t => t.languageCode && t.languageCode.startsWith('en')) ||
+      tracks[0];
+  }
 
-  if (!englishTrack || !englishTrack.baseUrl) {
+  if (!chosenTrack || !chosenTrack.baseUrl) {
     throw new Error('No usable captions');
   }
 
-  const captionsResponse = await fetch(englishTrack.baseUrl);
+  const captionsResponse = await fetch(chosenTrack.baseUrl);
   if (!captionsResponse.ok) {
     throw new Error(`Captions fetch failed: ${captionsResponse.status}`);
   }
@@ -346,7 +357,7 @@ function decodeHtmlEntities(str) {
 // ============================================================
 // STEP 3: Whisper 백업
 // ============================================================
-async function transcribeWithWhisper(videoUrl) {
+async function transcribeWithWhisper(videoUrl, isKorean = false) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY not configured');
   }
@@ -381,7 +392,7 @@ async function transcribeWithWhisper(videoUrl) {
     model: 'whisper-1',
     response_format: 'verbose_json',
     timestamp_granularities: ['segment'],
-    language: 'en'
+    language: isKorean ? 'ko' : 'en'
   });
 
   const segments = (transcription.segments || [])
@@ -398,7 +409,7 @@ async function transcribeWithWhisper(videoUrl) {
 // ============================================================
 // STEP 4: Claude로 번역 + 교육자료화
 // ============================================================
-async function generateLessonWithClaude(segments) {
+async function generateLessonWithClaude(segments, isKorean = false) {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY not configured');
   }
@@ -413,7 +424,52 @@ async function generateLessonWithClaude(segments) {
     `${i + 1}. [${s.start.toFixed(1)}~${s.end.toFixed(1)}s] ${s.text}`
   ).join('\n');
 
-  const prompt = `You are an expert English teacher creating lesson content for Korean learners studying with the "shadowing + chunking" method (used by TOEIC instructors for 15+ years).
+  const koreanPrompt = `You are an expert Korean-language teacher creating lesson content for ENGLISH-SPEAKING learners studying Korean with the "shadowing + chunking" method.
+
+Here are raw YouTube caption segments in KOREAN (short, often cut mid-sentence):
+${segmentsText}
+
+YOUR JOB (Korean learning mode):
+1. MERGE these short segments into COMPLETE, natural Korean sentences.
+2. Add chunk markers "|" at meaningful breath/pause points in the KOREAN sentence.
+3. For each sentence provide:
+   - "ko": the complete KOREAN sentence with chunk markers (THIS IS THE MAIN TEXT to learn)
+   - "phonetic": ROMANIZATION of the Korean (Revised Romanization of Korean), with SAME chunk markers
+   - "en": natural ENGLISH translation (the meaning), with SAME chunk markers
+   - "start"/"end": timing
+   - "core": most important Korean content word
+   - "highlight": 2-4 word key Korean phrase containing the core
+   - "translations.en.highlight": English meaning of the highlight
+
+ROMANIZATION RULES (Revised Romanization):
+- 안녕하세요 → annyeonghaseyo
+- 제주도 → jejudo
+- 먹방 → meokbang
+- 감사합니다 → gamsahamnida
+- Use spaces between words, lowercase, no diacritics
+
+CHUNK RULES:
+- 3-6 단어(eojeol) per chunk
+- Break at natural particle/phrase boundaries (~은/는, ~을/를, ~에서, ~고, ~지만)
+- Same number of "|" in ko, phonetic, and en
+
+Return ONLY valid JSON (no markdown):
+{
+  "sentences": [
+    {
+      "ko": "요즘 제주도를 | 2박 3일로 여행하면 | 얼마나 들까요?",
+      "phonetic": "yojeum jejudoreul | ibak samilro yeohaenghamyeon | eolmana deulkkayo?",
+      "en": "How much would it cost | to travel to Jeju Island | for 2 nights and 3 days these days?",
+      "start": 0.1,
+      "end": 3.6,
+      "core": "여행",
+      "highlight": "제주도를 여행하다",
+      "translations": { "en": { "highlight": "travel to Jeju Island" } }
+    }
+  ]
+}`;
+
+  const englishPrompt = `You are an expert English teacher creating lesson content for Korean learners studying with the "shadowing + chunking" method (used by TOEIC instructors for 15+ years).
 
 Here are raw YouTube caption segments (short, often cut mid-sentence):
 ${segmentsText}
@@ -686,6 +742,8 @@ Return ONLY valid JSON (no markdown, no code blocks, no explanation):
   ]
 }`;
 
+  const prompt = isKorean ? koreanPrompt : englishPrompt;
+
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 4000,
@@ -735,7 +793,7 @@ Return ONLY valid JSON (no markdown, no code blocks, no explanation):
     const prev = i > 0 ? parsed.sentences[i - 1] : null;
 
     // 단어 수 기반 권장 최소 길이 (단어당 0.3초, 최소 1.2초)
-    const wordCount = (cur.en || '').split(/\s+/).filter(Boolean).length;
+    const wordCount = ((isKorean ? cur.ko : cur.en) || '').split(/\s+/).filter(Boolean).length;
     const minDur = Math.max(1.2, wordCount * 0.3);
 
     // 이전 문장 끝보다 시작이 빠르면(겹침/역행) → 이전 끝으로 밀기
