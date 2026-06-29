@@ -34,10 +34,10 @@ const SEARCH_QUERIES = {
 
 // 카테고리별 최소 조회수 기준
 const MIN_VIEWS = {
-  food: 500, fun: 500, culture: 500,
-  people: 500, places: 500,
-  shopping: 500, home: 500, cars: 500,
-  work: 500, travel_english: 500
+  food: 100, fun: 100, culture: 100,
+  people: 100, places: 100,
+  shopping: 100, home: 100, cars: 100,
+  work: 100, travel_english: 100
 };
 
 // ISO 8601 duration (PT1M15S) → 초 변환
@@ -216,7 +216,7 @@ export default async function handler(req, res) {
     }
 
     // 4. 필터링 + 점수 계산
-    const minViews = MIN_VIEWS[category] || 500;
+    const minViews = MIN_VIEWS[category] || 100;
     
     const filtered = (videosData.items || [])
       .map(item => {
