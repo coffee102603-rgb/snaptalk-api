@@ -18,15 +18,17 @@ const SEARCH_QUERIES = {
   },
 
   kr: {
-    culture: ['kpop shorts english', 'kdrama shorts english', 'kbeauty shorts english', 'hallyu shorts'],
-    food: ['korean street food shorts', 'korean mukbang shorts', 'korean cooking shorts'],
-    people: ['korean street interview shorts', 'seoul interview shorts'],
-    home: ['korean routine shorts', 'seoul daily life shorts'],
-    places: ['seoul travel shorts', 'korea travel shorts english', 'jeju travel shorts'],
-    shopping: ['korean haul shorts', 'daiso haul shorts', 'seoul shopping shorts'],
-    fun: ['korean challenge shorts', 'kpop dance shorts'],
-    cars: ['korean car review shorts'],
-    work: ['korean business shorts english']
+    // 한국어 콘텐츠 검색 — 한국인이 한국어로 말하는 영상
+    food: ['한국 먹방', '먹방 쇼츠', '집밥 브이로그', '한국 길거리 음식', '편의점 먹방', '자취 요리 브이로그', '한식 요리 쇼츠', '맛집 먹방 쇼츠'],
+    people: ['길거리 인터뷰', '서울 길거리 인터뷰', '한국 일상 브이로그 말하기', '대학생 브이로그', '직장인 브이로그', '한국어 회화 일상'],
+    home: ['하루 일과 브이로그', '자취 브이로그', '아침 루틴 브이로그', '직장인 하루 브이로그', '대학생 일상 브이로그', '원룸 자취 브이로그'],
+    places: ['서울 여행 브이로그', '제주 여행 브이로그', '부산 여행 브이로그', '한국 여행 쇼츠', '서울 가볼만한곳', '국내 여행 브이로그'],
+    shopping: ['다이소 하울', '올리브영 하울', '편의점 신상', '쿠팡 하울', '쇼핑 하울 브이로그', '장보기 브이로그'],
+    fun: ['한국 챌린지 쇼츠', '커플 챌린지', '웃긴 쇼츠 한국', '댄스 챌린지 쇼츠'],
+    cars: ['자동차 리뷰 쇼츠', '신차 리뷰 한국', '차량 브이로그'],
+    work: ['직장인 브이로그 회사', '신입사원 브이로그', '회사 일상 브이로그', '면접 꿀팁 쇼츠'],
+    culture: ['케이팝 댄스 쇼츠', 'kpop 안무 쇼츠', '한국 문화 쇼츠', '전통 체험 브이로그', '한복 브이로그'],
+    travel_english: ['카페 주문 한국어', '식당 주문 한국어', '한국어 일상 회화', '한국어 기초 회화', '한국 여행 회화']
   }
 };
 
@@ -152,7 +154,10 @@ export default async function handler(req, res) {
     searchUrl.searchParams.set('q', query);
     searchUrl.searchParams.set('type', 'video');
     searchUrl.searchParams.set('videoDuration', 'short'); // ~4분 이하
-    searchUrl.searchParams.set('videoCaption', 'closedCaption'); // ⭐ 자막 있는 영상만!
+    // 자막 제약: 미국(영어)은 자막 필수, 한국은 완화 (한국어 영상은 자막 적음)
+    if (region !== 'kr') {
+      searchUrl.searchParams.set('videoCaption', 'closedCaption');
+    } // ⭐ 자막 있는 영상만!
     searchUrl.searchParams.set('maxResults', '50');
     searchUrl.searchParams.set('order', 'viewCount');
     searchUrl.searchParams.set('regionCode', region === 'kr' ? 'KR' : 'US');
