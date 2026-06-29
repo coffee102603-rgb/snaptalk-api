@@ -93,6 +93,28 @@ function scoreEducation(video) {
   return Math.min(100, Math.max(0, score));
 }
 
+// ✈️ 모드 B용: 공식 관광 채널 신호 (이게 들어가면 안전 가점)
+const OFFICIAL_TOURISM = [
+  'tourism', 'visitkorea', 'visit korea', 'imagine your korea',
+  '관광공사', '관광', '시청', '도청', '군청', 'city hall',
+  'official', 'gyeongju', 'andong', 'seoul', 'busan', 'jeju',
+  '경주시', '안동시', '서울시', '부산시', '제주', '문화재', '여행',
+];
+// 관광 모드에서 검색할 카테고리 (CC 필터 끄고 공식채널 위주)
+const TOURISM_CATS = ['places', 'travel_english'];
+
+// 🚫 연예인/유명인 출연 영상 제외 (퍼블리시티권 리스크)
+const CELEBRITY_BLOCK = [
+  '박보검', '뉴진스', 'newjeans', 'bts', '방탄', '이정재',
+  '이날치', '블랙핑크', 'blackpink', '아이유', 'iu', '손흥민',
+  'jungkook', 'jimin', 'suga', '지드래곤', 'g-dragon',
+  '명예홍보대사', 'ambassador', '광고대사',
+];
+function hasCelebrity(title, description) {
+  const text = (title + ' ' + description).toLowerCase();
+  return CELEBRITY_BLOCK.some(kw => text.includes(kw.toLowerCase()));
+}
+
 // 저작권 안전도 (공식 채널일수록 위험, 개인 크리에이터 안전)
 function scoreSafety(channelTitle, description) {
   const danger = [
@@ -109,6 +131,8 @@ function scoreSafety(channelTitle, description) {
   ];
   const text = (channelTitle + ' ' + description).toLowerCase();
   if (danger.some(kw => text.includes(kw))) return 5;  // 저작권 위험 = 강한 감점
+  // ✈️ 공식 관광채널이면 최고 안전 가점
+  if (OFFICIAL_TOURISM.some(kw => text.includes(kw))) return 98;
   return 90;
 }
 
@@ -169,7 +193,13 @@ export default async function handler(req, res) {
     if (region !== 'kr') {
       searchUrl.searchParams.set('videoCaption', 'closedCaption');
     } // ⭐ 자막 있는 영상만!
-    searchUrl.searchParams.set('videoLicense', 'creativeCommon'); // ⚖️ CC 라이선스 영상만! (합법 재사용)
+    // ⚖️ 라이선스 모드:
+    //   - 관광 카테고리(places/travel_english) = 모드 B → CC 끄고 공식채널 위주(아래 필터)
+    //   - 그 외 = CC 라이선스만 (가장 안전)
+    const isTourismMode = TOURISM_CATS.includes(category);
+    if (!isTourismMode) {
+      searchUrl.searchParams.set('videoLicense', 'creativeCommon');
+    } // 관광 모드는 라이선스 필터 생략 → 공식 관광영상 풀 확보
     searchUrl.searchParams.set('maxResults', '50');
     searchUrl.searchParams.set('order', 'viewCount');
     searchUrl.searchParams.set('regionCode', region === 'kr' ? 'KR' : 'US');
@@ -203,7 +233,7 @@ export default async function handler(req, res) {
 
     // 3. Videos API 호출 (조회수, 길이, 좋아요 등 상세 정보)
     const videosUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
-    videosUrl.searchParams.set('part', 'snippet,contentDetails,statistics');
+    videosUrl.searchParams.set('part', 'snippet,contentDetails,statistics,status');
     videosUrl.searchParams.set('id', videoIds);
     videosUrl.searchParams.set('key', process.env.YOUTUBE_API_KEY);
 
@@ -236,13 +266,17 @@ export default async function handler(req, res) {
           likeCount,
           thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.medium?.url,
           hasCaption: item.contentDetails.caption === 'true',
-          language: item.snippet.defaultLanguage || item.snippet.defaultAudioLanguage || 'unknown'
+          language: item.snippet.defaultLanguage || item.snippet.defaultAudioLanguage || 'unknown',
+          embeddable: item.status ? item.status.embeddable !== false : true,
+          license: item.status ? item.status.license : 'youtube'
         };
       })
       .filter(v => {
         if (v.duration < 8 || v.duration > 180) return false; // 10~90초만
         if (v.viewCount < minViews) return false;
         if (isBlockedContent(v.title, v.description)) return false;
+        if (v.embeddable === false) return false; // 🔌 임베드 차단 영상 제외 (재생불가 방지)
+        if (hasCelebrity(v.title, v.description)) return false; // 🚫 연예인 출연 제외 (퍼블리시티권)
         // 🇰🇷 한국 모드: 제목에 한글이 거의 없으면 외국인 영어 영상 → 제외
         if (region === 'kr') {
           const koreanChars = (v.title.match(/[가-힣]/g) || []).length;
