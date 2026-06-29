@@ -713,16 +713,59 @@ Return ONLY valid JSON (no markdown, no code blocks, no explanation):
   const firstSegStart = workingSegments[0]?.start ?? 0;
   const lastSegEnd = workingSegments[workingSegments.length - 1]?.end ?? 999;
 
+  // ① 1차 클램핑: 각 문장 시간을 원본 범위 안으로
   parsed.sentences = parsed.sentences.map((s) => {
     let start = typeof s.start === 'number' ? s.start : firstSegStart;
     let end = typeof s.end === 'number' ? s.end : lastSegEnd;
-    // 안전 장치: 범위 밖이면 클램핑
     if (start < 0) start = 0;
-    if (end <= start) end = start + 2; // 최소 2초
     if (start < firstSegStart - 1) start = firstSegStart;
     if (end > lastSegEnd + 1) end = lastSegEnd;
+    if (end <= start) end = start + 1.5;
     return { ...s, start, end };
   });
+
+  // ② 시작 시간 순으로 정렬 (Claude가 순서를 섞었을 수 있음)
+  parsed.sentences.sort((a, b) => a.start - b.start);
+
+  // ③ 순차 보정: 겹침/역행 제거
+  //    - 다음 문장 시작은 이전 문장 끝 이상이어야 함
+  //    - 각 문장은 최소 1.2초, 단어 수 비례 최소 길이 보장
+  for (let i = 0; i < parsed.sentences.length; i++) {
+    const cur = parsed.sentences[i];
+    const prev = i > 0 ? parsed.sentences[i - 1] : null;
+
+    // 단어 수 기반 권장 최소 길이 (단어당 0.3초, 최소 1.2초)
+    const wordCount = (cur.en || '').split(/\s+/).filter(Boolean).length;
+    const minDur = Math.max(1.2, wordCount * 0.3);
+
+    // 이전 문장 끝보다 시작이 빠르면(겹침/역행) → 이전 끝으로 밀기
+    if (prev && cur.start < prev.end) {
+      cur.start = prev.end;
+    }
+
+    // 끝이 시작보다 빠르거나 너무 짧으면 → 최소 길이 보장
+    if (cur.end <= cur.start) {
+      cur.end = cur.start + minDur;
+    }
+
+    // 다음 문장이 있으면, 끝이 다음 시작을 넘지 않게 (단, 최소 길이는 지킴)
+    const next = i < parsed.sentences.length - 1 ? parsed.sentences[i + 1] : null;
+    if (next && typeof next.start === 'number' && cur.end > next.start) {
+      // 다음 시작 전까지로 줄이되, 최소 길이보다 작아지면 그대로 둠(겹침 허용 < 역행 방지 우선)
+      const trimmed = next.start;
+      if (trimmed > cur.start + 0.5) {
+        cur.end = trimmed;
+      }
+    }
+
+    // 전체 영상 범위 밖으로 나가지 않게
+    if (cur.end > lastSegEnd + 1) cur.end = lastSegEnd;
+    if (cur.start > lastSegEnd) cur.start = Math.max(firstSegStart, lastSegEnd - minDur);
+
+    // 소수점 1자리로 정리
+    cur.start = Math.round(cur.start * 10) / 10;
+    cur.end = Math.round(cur.end * 10) / 10;
+  }
 
   if (isPartial) {
     parsed.note = `Merged from ${segments.length} raw segments into ${parsed.sentences.length} sentences`;
