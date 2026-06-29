@@ -154,6 +154,9 @@ export default async function handler(req, res) {
     searchUrl.searchParams.set('q', query);
     searchUrl.searchParams.set('type', 'video');
     searchUrl.searchParams.set('videoDuration', 'short'); // ~4분 이하
+    // ⚖️ 저작권 안전: 크리에이티브 커먼즈(CC) 라이선스 영상만!
+    //    → 더빙/자막 활용이 합법적인 영상만 검색됨
+    searchUrl.searchParams.set('videoLicense', 'creativeCommon');
     // 자막 제약: 미국(영어)은 자막 필수, 한국은 완화 (한국어 영상은 자막 적음)
     if (region !== 'kr') {
       searchUrl.searchParams.set('videoCaption', 'closedCaption');
