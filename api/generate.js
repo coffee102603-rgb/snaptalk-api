@@ -160,7 +160,11 @@ export default async function handler(req, res) {
       source,
       segmentsCount: segments.length,
       elapsed: elapsed + 's',
-      sentences: lesson.sentences
+      sentences: lesson.sentences,
+      /* 🆕 원본 세그먼트 타이밍 (앱에서 정확한 청크 시간 계산용) */
+      rawSegments: segmentsToProcess.map(function(s){
+        return { text: s.text, start: s.start, end: s.end };
+      })
     });
 
   } catch (err) {
