@@ -829,6 +829,50 @@ Return ONLY valid JSON (no markdown, no code blocks, no explanation):
     cur.end = Math.round(cur.end * 10) / 10;
   }
 
+  // ④ 🎯 rawSegments 단어겹침 매칭으로 실제 시간 덮어쓰기 (근본 해결)
+  //    Claude 추측 시간 대신, 단어가 50%+ 겹치는 실제 세그먼트 구간의 타이밍 사용
+  try {
+    const normalize = (str) => (str || '')
+      .toLowerCase()
+      .replace(/[|]/g, ' ')
+      .replace(/[^a-z0-9가-힣\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const segNorms = workingSegments.map(s => {
+      const ws = normalize(s.text).split(' ').filter(Boolean);
+      return { wordsSet: new Set(ws), wordCount: ws.length, start: s.start, end: s.end };
+    });
+
+    let matchedCount = 0;
+    parsed.sentences.forEach((sent) => {
+      const sentWords = normalize(isKorean ? sent.ko : sent.en).split(' ').filter(Boolean);
+      if (sentWords.length === 0) return;
+      const sentSet = new Set(sentWords);
+
+      let firstSeg = -1, lastSeg = -1;
+      for (let si = 0; si < segNorms.length; si++) {
+        let overlap = 0;
+        segNorms[si].wordsSet.forEach(w => { if (sentSet.has(w)) overlap++; });
+        const ratio = overlap / Math.max(1, segNorms[si].wordCount);
+        if (ratio >= 0.5) {
+          if (firstSeg === -1) firstSeg = si;
+          lastSeg = si;
+        }
+      }
+
+      // 매칭 성공 시에만 덮어씀 (실패 시 기존 Claude 값 유지 = 안전)
+      if (firstSeg !== -1 && lastSeg !== -1 && segNorms[lastSeg].end > segNorms[firstSeg].start) {
+        sent.start = Math.round(segNorms[firstSeg].start * 10) / 10;
+        sent.end   = Math.round((segNorms[lastSeg].end + 0.3) * 10) / 10; // 끝에 0.3초 여유
+        matchedCount++;
+      }
+    });
+    console.log('  🎯 rawSegments 시간 매칭: ' + matchedCount + '/' + parsed.sentences.length + ' 문장 보정됨');
+  } catch (e) {
+    console.log('  ⚠️ 시간 매칭 스킵:', e.message);
+  }
+
   if (isPartial) {
     parsed.note = `Merged from ${segments.length} raw segments into ${parsed.sentences.length} sentences`;
   }
