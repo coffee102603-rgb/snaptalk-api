@@ -81,9 +81,23 @@ export default async function handler(req, res) {
     const attempts = [];
 
     // ========================================
-    // STEP 1: Supadata API ⭐ 메인!
+    // [임시 테스트] Whisper 먼저 시도 (단어 타임스탬프 확인용)
     // ========================================
     try {
+      console.log('  🧪 [TEST] Trying Whisper FIRST...');
+      segments = await transcribeWithWhisper(videoUrl, isKorean);
+      if (segments && segments.length > 0) {
+        source = 'whisper-test';
+        console.log(`  ✅ [TEST] Whisper: ${segments.length} segments, words 첨부됨`);
+      }
+    } catch (e) {
+      console.log(`  ⚠️ [TEST] Whisper 먼저 실패: ${e.message} → Supadata로 넘어감`);
+    }
+
+    // ========================================
+    // STEP 1: Supadata API (Whisper 실패 시)
+    // ========================================
+    if (!segments || segments.length === 0) try {
       console.log('  1️⃣ Trying Supadata API...');
       segments = await fetchViaSupadata(videoUrl, isKorean);
       if (segments && segments.length > 0) {
@@ -391,13 +405,25 @@ async function transcribeWithWhisper(videoUrl, isKorean = false) {
     file: await toFile(audioBuffer, 'audio.m4a'),
     model: 'whisper-1',
     response_format: 'verbose_json',
-    timestamp_granularities: ['segment'],
+    timestamp_granularities: ['word', 'segment'],
     language: isKorean ? 'ko' : 'en'
   });
+
+  /* 🆕 단어별 타임스탬프 (정확한 청크 매핑용) */
+  const allWords = (transcription.words || [])
+    .map(w => ({ word: (w.word||'').trim(), start: w.start, end: w.end }))
+    .filter(w => w.word.length > 0);
+  console.log(`  🔤 Whisper 단어 타임스탬프: ${allWords.length}개`);
 
   const segments = (transcription.segments || [])
     .map(s => ({ text: s.text.trim(), start: s.start, end: s.end }))
     .filter(s => s.text.length > 0 && s.end > s.start);
+  /* 세그먼트에 해당 구간의 단어들 첨부 */
+  segments.forEach(seg => {
+    seg.words = allWords.filter(w => w.start >= seg.start - 0.01 && w.end <= seg.end + 0.5);
+  });
+  /* 전체 단어도 반환에 실어둠 (디버그/검증용) */
+  if (segments.length > 0) segments._allWords = allWords;
 
   if (segments.length === 0) {
     throw new Error('Whisper returned no segments');
