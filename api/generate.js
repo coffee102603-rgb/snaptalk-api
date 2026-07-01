@@ -845,6 +845,7 @@ Return ONLY valid JSON (no markdown, no code blocks, no explanation):
     });
 
     let matchedCount = 0;
+    let prevEnd = 0; // 🔑 이전 문장 끝 (start 순서 보정용)
     parsed.sentences.forEach((sent) => {
       const sentWords = normalize(isKorean ? sent.ko : sent.en).split(' ').filter(Boolean);
       if (sentWords.length === 0) return;
@@ -861,11 +862,21 @@ Return ONLY valid JSON (no markdown, no code blocks, no explanation):
         }
       }
 
-      // 매칭 성공 시에만 덮어씀 (실패 시 기존 Claude 값 유지 = 안전)
       if (firstSeg !== -1 && lastSeg !== -1 && segNorms[lastSeg].end > segNorms[firstSeg].start) {
-        sent.start = Math.round(segNorms[firstSeg].start * 10) / 10;
-        sent.end   = Math.round((segNorms[lastSeg].end + 0.3) * 10) / 10; // 끝에 0.3초 여유
+        let ns = Math.round(segNorms[firstSeg].start * 10) / 10;
+        let ne = Math.round((segNorms[lastSeg].end + 0.3) * 10) / 10;
+        // 🔑 start가 이전 문장 끝보다 너무 이르면(0.5s+) 이전 끝으로 보정 → 앞으로 튐 방지
+        if (ns < prevEnd - 0.5) ns = Math.round(prevEnd * 10) / 10;
+        sent.start = ns;
+        sent.end = ne;
+        prevEnd = ne;
         matchedCount++;
+      } else {
+        // 매칭 실패: 이전 문장 끝 이후로 start 보정 (앞으로 튀는 것만 방지)
+        if (typeof sent.start === 'number' && sent.start < prevEnd - 0.5) {
+          sent.start = Math.round(prevEnd * 10) / 10;
+        }
+        if (typeof sent.end === 'number') prevEnd = sent.end;
       }
     });
     console.log('  🎯 rawSegments 시간 매칭: ' + matchedCount + '/' + parsed.sentences.length + ' 문장 보정됨');
